@@ -25,15 +25,16 @@ router.post("/:businessId", authenticateToken, async (req, res) => {
     const startDate = getDateRange(range);
 
     const { rows } = await pool.query(
-      `SELECT
-         COUNT(*)::int                          AS total_orders,
-         COALESCE(SUM(refund_amount), 0)::float AS total_refund,
-         COALESCE(AVG(refund_amount), 0)::float AS avg_refund,
-         COUNT(DISTINCT order_no)::int          AS unique_orders
-       FROM sheets
-       WHERE business_id = $1 AND date >= $2`,
-      [businessId, startDate]
-    );
+  `SELECT
+     COUNT(*)::int                          AS total_orders,
+     COALESCE(SUM(refund_amount), 0)::float AS total_refund,
+     COALESCE(AVG(refund_amount), 0)::float AS avg_refund,
+     COUNT(DISTINCT order_no)::int          AS unique_orders
+   FROM sheets
+   WHERE business_id = $1 AND date_received >= $2`,  // <-- changed here
+  [businessId, startDate]
+);
+
 
     const r = rows[0];
     res.json({

@@ -16,12 +16,11 @@ const seed = async () => {
 
     for (const role of rolesData) {
       await pool.query(
-  `INSERT INTO roles (name, permissions)
-   VALUES ($1, $2)
-   ON CONFLICT (name) DO NOTHING`,
-  [role.name, role.permissions]
-);
-
+        `INSERT INTO roles (name, permissions)
+         VALUES ($1, $2)
+         ON CONFLICT (name) DO NOTHING`,
+        [role.name, role.permissions]
+      );
     }
     console.log('Roles ensured');
 
@@ -89,24 +88,45 @@ const seed = async () => {
     );
 
     if (sheetExists.rows.length === 0) {
+      // Compute platform and return_within_30_days
+      const date_received = '2025-08-27';
+      const order_date = '2025-08-01';
+      const order_no = '12345678';
+      const platform = /^\d{8}$/.test(order_no) ? 'Back Market' : 'Amazon';
+      const diffDays = Math.floor((new Date(date_received) - new Date(order_date)) / (1000*60*60*24));
+      const return_within_30_days = diffDays <= 30 ? 'Yes' : 'No';
+
       await pool.query(
         `INSERT INTO sheets
-        (business_id, date, order_no, customer_name, imei, sku, customer_comment, return_type, refund_amount, platform, return_within_30_days, issue, out_of_warranty)
-        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+        (business_id, date_received, order_no, order_date, customer_name, imei, sku, customer_comment, multiple_return, apple_google_id, return_type, replacement_available, done_by, blocked_by, cs_comment, resolution, refund_amount, return_tracking_no, platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes)
+        VALUES
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
         [
           business.id,
-          '2025-08-27',
-          'ORD123456',
+          date_received,
+          order_no,
+          order_date,
           'John Doe',
           '357504147972616',
           'iPhone 14 128GB Purple',
           'Customer changed mind',
+          'No',
+          'Yes',
           'REFUND',
+          'Yes',
+          'Shah',
+          'PIN required',
+          'Handled by CS',
+          'Back in stock',
           450.0,
-          'Back Market',
-          true,
-          'No issues',
-          false
+          'RT123456',
+          platform,
+          return_within_30_days,
+          'Battery',
+          'No',
+          'Additional notes here',
+          'Pending',
+          'Manager note here'
         ]
       );
       console.log('Sample sheet created');

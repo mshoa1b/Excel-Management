@@ -13,21 +13,33 @@ router.get("/:businessId", authenticateToken, async (req, res) => {
       SELECT
         id,
         business_id,
-        date,
+        date_received,
+        order_date,
         order_no,
         customer_name,
         imei,
         sku,
         customer_comment,
+        multiple_return,
+        apple_google_id,
         return_type,
-        COALESCE(refund_amount, 0)::float AS refund_amount, -- cast to number
+        replacement_available,
+        done_by,
+        blocked_by,
+        cs_comment,
+        resolution,
+        COALESCE(refund_amount,0)::float AS refund_amount,
+        return_tracking_no,
         platform,
         return_within_30_days,
         issue,
-        out_of_warranty
+        out_of_warranty,
+        additional_notes,
+        status,
+        manager_notes
       FROM sheets
       WHERE business_id = $1
-      ORDER BY date DESC, id DESC
+      ORDER BY date_received DESC, id DESC
       `,
       [businessId]
     );
