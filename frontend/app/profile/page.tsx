@@ -205,25 +205,39 @@ export default function ProfilePage() {
           </Card>
 
           {/* Permissions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Shield className="h-5 w-5 text-purple-600" />
-                <span>Permissions</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {user?.role.permissions.map((permission, index) => (
-                  <div key={index} className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span className="text-slate-700">{permission}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+{user?.role && Array.isArray(user.role.permissions) && user.role.permissions.length > 0 ? (
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center space-x-2">
+        <Shield className="h-5 w-5 text-purple-600" />
+        <span>Permissions</span>
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {user.role.permissions.map((permission: string, index: number) => (
+          <div key={index} className="flex items-center space-x-2">
+            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+            <span className="text-slate-700">{permission}</span>
+          </div>
+        ))}
+      </div>
+    </CardContent>
+  </Card>
+) : (
+  <Card>
+    <CardHeader>
+      <CardTitle className="flex items-center space-x-2">
+        <Shield className="h-5 w-5 text-purple-600" />
+        <span>Permissions</span>
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <p className="text-slate-500">No specific permissions assigned for this role.</p>
+    </CardContent>
+  </Card>
+)}
+       </div>
       </DashboardLayout>
     </ProtectedRoute>
   );
