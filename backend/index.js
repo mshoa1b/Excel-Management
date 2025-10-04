@@ -5,9 +5,10 @@ require("dotenv").config();
 
 const authRoutes = require("./routes/auth");
 const businessRoutes = require("./routes/business");
-const usersRoutes = require("./routes/users");     // ← add this
-const sheetsRoutes = require("./routes/sheets");   // ← ensure file is named sheets.js
+const usersRoutes = require("./routes/users");    
+const sheetsRoutes = require("./routes/sheets");   
 const statsRoutes = require("./routes/stats");
+const bmOrdersRouter = require('./routes/bmOrders');
 
 const app = express();
 
@@ -17,9 +18,10 @@ app.use(bodyParser.json());
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/businesses", businessRoutes);
-app.use("/api/users", usersRoutes);      // ← add this
+app.use("/api/users", usersRoutes);      
 app.use("/api/sheets", sheetsRoutes);
 app.use("/api/stats", statsRoutes);
+app.use('/api/bmOrders', bmOrdersRouter);
 
 // Health Check
 app.get("/", (req, res) => res.send("SaaS Backend is running"));

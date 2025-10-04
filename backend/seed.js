@@ -24,7 +24,6 @@ const seed = async () => {
     }
     console.log('Roles ensured');
 
-    // Fetch role IDs dynamically
     const rolesResult = await pool.query('SELECT * FROM roles');
     const roles = {};
     rolesResult.rows.forEach(r => { roles[r.name] = r.id; });
@@ -88,19 +87,22 @@ const seed = async () => {
     );
 
     if (sheetExists.rows.length === 0) {
-      // Compute platform and return_within_30_days
       const date_received = '2025-08-27';
       const order_date = '2025-08-01';
       const order_no = '12345678';
       const platform = /^\d{8}$/.test(order_no) ? 'Back Market' : 'Amazon';
       const diffDays = Math.floor((new Date(date_received) - new Date(order_date)) / (1000*60*60*24));
       const return_within_30_days = diffDays <= 30 ? 'Yes' : 'No';
+      const today = new Date().toISOString().slice(0,10);
 
       await pool.query(
         `INSERT INTO sheets
-        (business_id, date_received, order_no, order_date, customer_name, imei, sku, customer_comment, multiple_return, apple_google_id, return_type, replacement_available, done_by, blocked_by, cs_comment, resolution, refund_amount, return_tracking_no, platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes)
+        (business_id, date_received, order_no, order_date, customer_name, imei, sku, customer_comment,
+         multiple_return, apple_google_id, return_type, locked, oow_case, replacement_available, done_by,
+         blocked_by, cs_comment, resolution, refund_amount, refund_date, return_tracking_no, platform,
+         return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes)
         VALUES
-        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)`,
+        ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)`,
         [
           business.id,
           date_received,
@@ -112,13 +114,16 @@ const seed = async () => {
           'Customer changed mind',
           'No',
           'Yes',
-          'REFUND',
-          'Yes',
-          'Shah',
-          'PIN required',
+          'Refund',
+          'No',          // locked
+          'No',          // oow_case
+          'Yes',         // replacement_available
+          'Shah',        // done_by
+          'PIN Required',// blocked_by
           'Handled by CS',
           'Back in stock',
           450.0,
+          today,         // refund_date
           'RT123456',
           platform,
           return_within_30_days,

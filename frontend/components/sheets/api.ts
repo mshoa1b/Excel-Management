@@ -1,11 +1,11 @@
 import type { SheetRecord } from './types';
 
-// Hardcoded base URL to your Express server:
 const API_BASE = 'http://localhost:5000';
 
 async function request(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const url = `${API_BASE}${path}`;
+
   const res = await fetch(url, {
     ...options,
     headers: {
@@ -16,27 +16,19 @@ async function request(path: string, options: RequestInit = {}) {
   });
 
   if (!res.ok) {
-    if (res.status === 401) {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/login';
-      }
-      throw new Error('401 Unauthorized @ ' + url);
-    }
+    const text = await res.text();
     let body: any = null;
-    let text = '';
-    try { text = await res.text(); body = JSON.parse(text); } catch { /* ignore */ }
-    const msg = body?.message || body?.error || text || res.statusText || 'Request failed';
+    try { body = JSON.parse(text); } catch {}
+    const msg = body?.message || text || res.statusText;
     throw new Error(`${res.status} ${msg} @ ${url}`);
   }
 
   const ct = res.headers.get('content-type') || '';
   if (ct.includes('application/json')) return res.json();
-  const txt = await res.text();
-  try { return JSON.parse(txt); } catch { return txt; }
+  return res.text();
 }
 
+// -------------------- Sheet CRUD API --------------------
 export const listSheets = (businessId: string): Promise<SheetRecord[]> =>
   request(`/api/sheets/${businessId}`);
 
@@ -48,3 +40,12 @@ export const updateSheet = (businessId: string, payload: Partial<SheetRecord> & 
 
 export const deleteSheet = (businessId: string, id: number) =>
   request(`/api/sheets/${businessId}`, { method: 'DELETE', body: JSON.stringify({ id }) });
+
+// -------------------- BackMarket API via Backend --------------------
+export async function fetchBMOrder(orderNo: string) {
+  if (!orderNo || orderNo.length !== 8) throw new Error('Invalid BackMarket order number');
+
+  // Call your backend proxy route
+  const data = await request(`/api/bmOrders/${orderNo}`);
+  return data;
+}

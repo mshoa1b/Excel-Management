@@ -2,13 +2,12 @@ const express = require("express");
 const router = express.Router();
 const authenticateToken = require("../middleware/auth");
 const { getSheets, createSheet, updateSheet, deleteSheet } = require("../models/Sheet");
-const pool = require("../lib/db");
 
 // GET /api/sheets/:businessId
 router.get("/:businessId", authenticateToken, async (req, res) => {
   try {
     const { businessId } = req.params;
-    const { rows } = await pool.query(
+    const { rows } = await require("../lib/db").query(
       `
       SELECT
         id,
