@@ -28,8 +28,8 @@ export interface SheetRecord {
   id: number;
   business_id: number;
   blocked_by: string;
-  date_received: string;  // store as 'yyyy-MM-dd'
-  order_date: string;     // store as 'yyyy-MM-dd'
+  date_received: string;  // 'yyyy-MM-dd'
+  order_date: string;     // 'yyyy-MM-dd'
   order_no: string;
   customer_name: string;
   imei: string;
@@ -45,7 +45,7 @@ export interface SheetRecord {
   cs_comment: string;
   resolution: string;
   refund_amount: number;
-  refund_date?: string;   // store as 'yyyy-MM-dd'
+  refund_date?: string;   // 'yyyy-MM-dd'
   return_tracking_no: string;
   platform: string;
   return_within_30_days: boolean;
@@ -70,14 +70,12 @@ const MULTILINE_COLS = ['customer_comment', 'additional_notes', 'cs_comment', 'm
 // Helpers
 const toYMD = (v: any): string => {
   if (!v) return '';
-  // agDateCellEditor can give Date, string, or ISO
   const d = typeof v === 'string' ? new Date(v) : v instanceof Date ? v : new Date(v);
   if (isNaN(d.getTime())) return '';
   return format(d, 'yyyy-MM-dd');
 };
 
-// Parse a date-like value to a local midnight Date.
-// Supports 'yyyy-MM-dd', 'dd/MM/yyyy', or Date.
+// Parse a date-like value to a local midnight Date
 const toLocalMidnight = (v: string | Date | undefined | null): Date | null => {
   if (!v) return null;
 
@@ -86,13 +84,11 @@ const toLocalMidnight = (v: string | Date | undefined | null): Date | null => {
   }
 
   if (typeof v === 'string') {
-    // dd/MM/yyyy
     if (v.includes('/')) {
       const [dd, mm, yyyy] = v.split('/');
       const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
       return isNaN(d.getTime()) ? null : new Date(d.getFullYear(), d.getMonth(), d.getDate());
     }
-    // yyyy-MM-dd
     if (v.includes('-')) {
       const [yyyy, mm, dd] = v.split('-');
       const d = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
@@ -117,12 +113,84 @@ const normalizeForSave = (r: SheetRecord): SheetRecord => ({
   refund_date: r.refund_date ? toYMD(r.refund_date) : undefined,
 });
 
+/** ========= Row color helpers ========= **/
+
+const eq = (a?: string, b?: string) =>
+  (a ?? '').trim().toLowerCase() === (b ?? '').trim().toLowerCase();
+
+const notEmpty = (v?: string) => !!(v && v.trim().length);
+
+// Pick readable text color for a background
+const pickTextColor = (hex: string) => {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!m) return '#111';
+  const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+  const lum = (0.2126*r + 0.7152*g + 0.0722*b) / 255;
+  return lum > 0.6 ? '#111' : '#fff';
+};
+
+const colorForRow = (r?: SheetRecord): string => {
+  if (!r) return '#22C55E';
+
+  if (eq(r.status, 'resolved')) return '#166534';
+
+  if (!eq(r.status, 'resolved')) {
+    if (notEmpty(r.blocked_by)) {
+      const b = (r.blocked_by || '').trim();
+      if (eq(b, 'Awaiting Customer') || eq(b, 'Awaiting BM')) return '#F59E0B';
+      if (eq(b, 'Awaiting G&I')) return '#1D4ED8';
+      if (eq(b, 'Awaiting Softezm')) return '#F97316';
+      if (eq(b, 'Awaiting Replacement')) return '#DB2777';
+      return '#6B7280';
+    }
+
+    if (!notEmpty(r.blocked_by)) {
+      if (eq(r.return_type, 'refund')) {
+        if (notEmpty(r.locked) && !eq(r.locked, 'No')) return '#DC2626';
+        if (notEmpty(r.oow_case) && !eq(r.oow_case, 'No')) return '#B45309';
+        if ((!notEmpty(r.locked) || eq(r.locked, 'No')) && (!notEmpty(r.oow_case) || eq(r.oow_case, 'No')))
+          return '#F97316';
+      }
+
+      if (eq(r.return_type, 'replacement')) {
+        if (eq(r.replacement_available, 'yes') || eq(r.replacement_available, 'no')) return '#F97316';
+        return '#1D4ED8';
+      }
+    }
+
+    return '#22C55E';
+  }
+
+  return '#22C55E';
+};
+
+/** ==================================== **/
+
 export default function SheetsGrid({ businessId }: { businessId: string }) {
   const apiRef = useRef<GridApi<SheetRecord> | null>(null);
   const [rowData, setRowData] = useState<SheetRecord[]>([]);
   const [totals, setTotals] = useState<{ amazon: number; backmarket: number; total: number }>({
     amazon: 0, backmarket: 0, total: 0
   });
+
+  // Prevent hover from overriding row colors
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .ag-theme-alpine .ag-row-hover {
+        background-color: inherit !important;
+        color: inherit !important;
+        filter: none !important;
+      }
+      /* Also prevent cell hover overrides in some themes */
+      .ag-theme-alpine .ag-cell:hover {
+        background-color: transparent !important;
+        color: inherit !important;
+      }
+    `;
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
 
   // Autosize all except multiline
   const autoSizeNonMultiline = useCallback(() => {
@@ -139,14 +207,13 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   }, []);
 
   const reflowAutoHeight = useCallback(() => {
-    // For auto-height columns, this is the supported way to force a reflow
     apiRef.current?.onRowHeightChanged?.();
   }, []);
 
   // Stats based on refund_date
   const recomputeTodayTotals = useCallback((rows: SheetRecord[]) => {
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // local midnight
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const t = { amazon: 0, backmarket: 0, total: 0 };
 
     for (const r of rows) {
@@ -173,7 +240,6 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           id: Number(row.id),
           business_id: Number(row.business_id),
           refund_amount: Number(row.refund_amount ?? 0),
-          // Ensure dates are strings in 'yyyy-MM-dd' for consistent round trips
           date_received: row.date_received ? toYMD(row.date_received) : '',
           order_date: row.order_date ? toYMD(row.order_date) : '',
           refund_date: row.refund_date ? toYMD(row.refund_date) : '',
@@ -284,12 +350,12 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     const r = event.data;
     if (!r?.id) return;
 
-    // Normalize types before saving
     const payload = normalizeForSave(r);
 
-    // Special case: trigger BM fetch when order_no becomes 8 chars
+    // Trigger BM fetch when order_no becomes 8 chars
     if (event.colDef.field === 'order_no' && payload.order_no?.length === 8) {
       await handleBMOrderFetch(payload);
+      apiRef.current?.redrawRows?.({ rowNodes: [event.node] });
       return;
     }
 
@@ -311,12 +377,14 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       setRowData(next);
     }
 
+    // Update auto-height and row color immediately
     reflowAutoHeight();
+    apiRef.current?.redrawRows?.({ rowNodes: [event.node] });
   };
 
-  // Formatters and parsers to keep types correct in-grid
+  // Formatters and parsers
   const dateFormatter = (p: any) => (p.value ? format(new Date(p.value), 'dd/MM/yyyy') : '');
-  const dateParser = (p: any) => toYMD(p.newValue); // ensures yyyy-MM-dd
+  const dateParser = (p: any) => toYMD(p.newValue);
   const numberParser = (p: any) => {
     const n = parseFloat(p.newValue);
     return isNaN(n) ? 0 : n;
@@ -418,7 +486,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         <Button variant="outline" className="gap-2" onClick={refresh}><RotateCcw /> Refresh</Button>
       </div>
 
-      {/* Marketplace totals for today (based on refund_date) */}
+      {/* Marketplace totals for today */}
       <div className="flex flex-wrap gap-4 text-gray-800 font-medium mb-2">
         <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-md shadow-sm">
           <span className="text-blue-700 font-semibold">Amazon Refunds (Today):</span>
@@ -432,6 +500,26 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           <span className="text-slate-700 font-semibold">Total Refunds (All Marketplaces):</span>
           <span className="text-lg font-bold text-slate-900">${totals.total.toFixed(2)}</span>
         </div>
+      </div>
+
+      {/* Optional legend */}
+      <div className="flex flex-wrap gap-2 text-xs mb-2">
+        {[
+          ['#166534','Resolved'],
+          ['#F59E0B','Awaiting Customer/BM'],
+          ['#1D4ED8','Awaiting G&I or Replacement info unknown'],
+          ['#F97316','Awaiting Softezm / Refund default / Replacement check'],
+          ['#DB2777','Awaiting Replacement'],
+          ['#6B7280','Other blocked'],
+          ['#DC2626','Locked refund'],
+          ['#B45309','OOW refund'],
+          ['#22C55E','Unresolved fallback'],
+        ].map(([hex,label])=>(
+          <div key={hex} className="flex items-center gap-2 px-2 py-1 rounded border">
+            <span style={{backgroundColor: hex, width: 14, height: 14, borderRadius: 3}} />
+            <span>{label}</span>
+          </div>
+        ))}
       </div>
 
       <div className="ag-theme-alpine" style={{ width: '100%', height: '75vh', borderRadius: '0.5rem' }}>
@@ -453,10 +541,15 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             resizable: true,
             filter: true,
             minWidth: 100,
-            // no global wrapText/autoHeight to avoid vertical growth except where explicitly set
-            cellClass: 'px-2 py-1 border border-gray-200 hover:bg-gray-50',
+            // removed hover:bg-gray-50 to avoid white-out on hover
+            cellClass: 'px-2 py-1 border border-gray-200',
           }}
           getRowId={p => String(p.data?.id ?? Math.random())}
+          getRowStyle={(params) => {
+            const bg = colorForRow(params.data);
+            const color = pickTextColor(bg);
+            return { backgroundColor: bg, color };
+          }}
         />
       </div>
     </div>
