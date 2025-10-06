@@ -2,11 +2,11 @@
   "version": 2,
   "builds": [
     {
-      "src": "frontend/next.config.js",
+      "src": "frontend/package.json",
       "use": "@vercel/next"
     },
     {
-      "src": "backend/index.js",
+      "src": "backend/**/*.js",
       "use": "@vercel/node"
     }
   ],
@@ -24,8 +24,5 @@
     "backend/index.js": {
       "maxDuration": 30
     }
-  },
-  "buildCommand": "cd frontend && npm install && npm run build",
-  "outputDirectory": "frontend/.next",
-  "installCommand": "npm install --prefix frontend && npm install --prefix backend"
+  }
 }
