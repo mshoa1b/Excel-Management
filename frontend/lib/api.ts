@@ -1,6 +1,8 @@
 // src/api.ts
-// Use Next.js browser-exposed env var; fallback to localhost:5000
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000";
+// Use relative path for production, localhost for development
+const API_BASE_URL = typeof window !== 'undefined' 
+  ? '/api'  // Use relative path in browser
+  : "http://localhost:5000";  // Fallback for SSR
 
 class ApiClient {
   private getAuthHeaders() {

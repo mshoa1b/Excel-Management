@@ -30,9 +30,19 @@ app.use("/api/bmOrders", bmOrdersRoutes);
 
 app.use("/api", backmarketCredsRoutes);
 
+// Add init route for one-time database setup
+const initRoutes = require("./routes/init");
+app.use("/api/init", initRoutes);
+
 app.use((req, res) => {
   res.status(404).json({ message: `Not Found: ${req.method} ${req.originalUrl}` });
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// For local development
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+// Export for Vercel serverless functions
+module.exports = app;

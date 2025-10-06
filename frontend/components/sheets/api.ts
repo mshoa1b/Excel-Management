@@ -1,6 +1,8 @@
 import type { SheetRecord } from './types';
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = typeof window !== 'undefined' 
+  ? '/api'  // Use relative path in browser
+  : 'http://localhost:5000';  // Fallback for SSR
 
 async function request(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
