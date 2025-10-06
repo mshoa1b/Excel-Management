@@ -15,7 +15,9 @@ import {
   Building2, 
   User, 
   LogOut, 
-  Menu 
+  Menu, 
+  Settings,
+  Settings2
 } from 'lucide-react';
 
 export default function Navigation() {
@@ -43,15 +45,14 @@ export default function Navigation() {
       case 'Superadmin':
         return [
           ...baseItems,
-          { href: '/businesses', label: 'Businesses', icon: Building2 },
-          { href: '/users', label: 'Users', icon: Users },
+          { href: '/manage', label: 'Manage', icon: Settings2 },
         ];
       case 'Business Admin':
         return [
           ...baseItems,
           { href: `/sheets/${user.business_id}`, label: 'Sheets', icon: FileSpreadsheet },
           { href: `/stats/${user.business_id}`, label: 'Analytics', icon: BarChart3 },
-          { href: '/users', label: 'Users', icon: Users },
+          { href: '/manage', label: 'Manage', icon: Settings2 }
         ];
       case 'User':
         return [
