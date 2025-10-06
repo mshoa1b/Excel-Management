@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -9,44 +9,60 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api';
-import { Stats, Sheet } from '@/types';
+import type { Stats, Sheet } from '@/types';
 import { FileSpreadsheet, DollarSign, TrendingUp, Calendar, ArrowRight } from 'lucide-react';
 
+const currency = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
+
 export default function BusinessAdminDashboard() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [recentSheets, setRecentSheets] = useState<Sheet[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [error, setError] = useState<string>("");
+
+  const bizId = useMemo(
+    () => (user?.business_id != null ? String(user.business_id) : null),
+    [user?.business_id]
+  );
 
   useEffect(() => {
-    if (user?.business_id) {
-      loadData();
+    if (authLoading) return;
+    if (!bizId) {
+      setDataLoading(false);
+      return;
     }
-  }, [user]);
 
-  const loadData = async () => {
-    if (!user?.business_id) return;
+    let cancelled = false;
+    (async () => {
+      setDataLoading(true);
+      setError("");
+      try {
+        const [statsData, sheetsData] = await Promise.all([
+          apiClient.getStats(bizId, '1m'),
+          apiClient.getSheets(bizId),
+        ]);
+        if (cancelled) return;
+        setStats(statsData);
+        setRecentSheets(Array.isArray(sheetsData) ? sheetsData.slice(0, 5) : []);
+      } catch (e) {
+        if (cancelled) return;
+        setError(e instanceof Error ? e.message : 'Failed to load dashboard data');
+      } finally {
+        if (!cancelled) setDataLoading(false);
+      }
+    })();
 
-    try {
-      const [statsData, sheetsData] = await Promise.all([
-        apiClient.getStats(user.business_id, '1m'),
-        apiClient.getSheets(user.business_id),
-      ]);
-      setStats(statsData);
-      setRecentSheets(sheetsData.slice(0, 5));
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    return () => { cancelled = true; };
+  }, [authLoading, bizId]);
 
-  if (loading) {
+  // Show a nice loader while either auth or data is loading
+  if (authLoading || dataLoading) {
     return (
       <ProtectedRoute requiredRole="Business Admin">
         <DashboardLayout>
           <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
           </div>
         </DashboardLayout>
       </ProtectedRoute>
@@ -62,31 +78,38 @@ export default function BusinessAdminDashboard() {
             <p className="text-slate-600">Manage your business operations and view analytics</p>
           </div>
 
+          {/* Error banner */}
+          {error && (
+            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+              {error}
+            </div>
+          )}
+
           {/* Stats Cards */}
           {stats && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <StatsCard
                 title="Total Orders"
-                value={stats.totalOrders}
-                description="This month"
+                value={stats.totalOrders ?? 0}
+                description="This period"
                 icon={FileSpreadsheet}
               />
               <StatsCard
                 title="Total Refunds"
-                value={`$${stats.totalRefundAmount.toFixed(2)}`}
-                description="This month"
+                value={currency.format(Number(stats.totalRefundAmount ?? 0))}
+                description="This period"
                 icon={DollarSign}
               />
               <StatsCard
                 title="Average Refund"
-                value={`$${stats.averageRefundAmount.toFixed(2)}`}
+                value={currency.format(Number(stats.averageRefundAmount ?? 0))}
                 description="Per order"
                 icon={TrendingUp}
               />
               <StatsCard
-                title="Returns (30 days)"
-                value={stats.ordersWithin30Days}
-                description="Within warranty"
+                title="Unique Orders"
+                value={stats.uniqueOrders ?? 0}
+                description="Deduped by order no."
                 icon={Calendar}
               />
             </div>
@@ -103,8 +126,8 @@ export default function BusinessAdminDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="text-slate-600 mb-4">Create, edit, and manage all your business sheets</p>
-                <Link href={`/sheets/${user?.business_id}`}>
-                  <Button className="w-full">
+                <Link href={bizId ? `/sheets/${bizId}` : '#'} aria-disabled={!bizId}>
+                  <Button className="w-full" disabled={!bizId}>
                     Manage Sheets
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -121,8 +144,8 @@ export default function BusinessAdminDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="text-slate-600 mb-4">View detailed statistics and insights</p>
-                <Link href={`/stats/${user?.business_id}`}>
-                  <Button variant="outline" className="w-full">
+                <Link href={bizId ? `/stats/${bizId}` : '#'} aria-disabled={!bizId}>
+                  <Button variant="outline" className="w-full" disabled={!bizId}>
                     View Analytics
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
@@ -135,8 +158,8 @@ export default function BusinessAdminDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Recent Sheets</CardTitle>
-              <Link href={`/sheets/${user?.business_id}`}>
-                <Button variant="outline" size="sm">
+              <Link href={bizId ? `/sheets/${bizId}` : '#'} aria-disabled={!bizId}>
+                <Button variant="outline" size="sm" disabled={!bizId}>
                   View All
                 </Button>
               </Link>
@@ -146,18 +169,24 @@ export default function BusinessAdminDashboard() {
                 {recentSheets.length === 0 ? (
                   <p className="text-center text-slate-500 py-8">No sheets found</p>
                 ) : (
-                  recentSheets.map((sheet) => (
-                    <div key={sheet.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                      <div>
-                        <p className="font-medium text-slate-800">{sheet.order_no}</p>
-                        <p className="text-sm text-slate-500">{sheet.customer_name}</p>
+                  recentSheets.map((sheet) => {
+                    const refund = Number(sheet.refund_amount ?? 0);
+                    return (
+                      <div
+                        key={sheet.id}
+                        className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
+                      >
+                        <div>
+                          <p className="font-medium text-slate-800">{sheet.order_no || '—'}</p>
+                          <p className="text-sm text-slate-500">{sheet.customer_name || '—'}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium text-slate-800">{currency.format(refund)}</p>
+                          <p className="text-sm text-slate-500">{sheet.return_type || '—'}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="font-medium text-slate-800">${sheet.refund_amount.toFixed(2)}</p>
-                        <p className="text-sm text-slate-500">{sheet.return_type}</p>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </CardContent>

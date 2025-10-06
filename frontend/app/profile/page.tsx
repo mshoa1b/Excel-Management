@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { User, Building2, Calendar, Shield, Loader2 } from 'lucide-react';
+import { apiClient } from '@/lib/api'; // <-- wire-up
+import { User as UserIcon, Building2, Shield, Loader2 } from 'lucide-react';
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -27,16 +28,34 @@ export default function ProfilePage() {
     setError('');
     setSuccess('');
 
+    // frontend validation to match your backend rules
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setError('Please fill all the password fields.');
+      setLoading(false);
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters.');
+      setLoading(false);
+      return;
+    }
     if (newPassword !== confirmPassword) {
-      setError('New passwords do not match');
+      setError('New passwords do not match.');
       setLoading(false);
       return;
     }
 
     try {
-      // TODO: Implement password change API call
-      // await apiClient.changePassword(currentPassword, newPassword);
-      setSuccess('Password changed successfully');
+      // Calls /api/users/me/password (requires current, new, confirm)
+            console.log('🔐 Changing my password with payload:', {
+        current_password: '***hidden***',
+        new_password_len: newPassword.length,
+        confirm_matches: newPassword === confirmPassword,
+      });
+      
+      await apiClient.changeMyPassword(currentPassword, newPassword);
+
+      setSuccess('Password changed successfully.');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -48,7 +67,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <ProtectedRoute>
+    <ProtectedRoute requiredRole="User">
       <DashboardLayout>
         <div className="space-y-8 max-w-4xl">
           <div>
@@ -61,7 +80,7 @@ export default function ProfilePage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <User className="h-5 w-5 text-blue-600" />
+                  <UserIcon className="h-5 w-5 text-blue-600" />
                   <span>Account Information</span>
                 </CardTitle>
               </CardHeader>
@@ -70,21 +89,21 @@ export default function ProfilePage() {
                   <span className="text-slate-600">Username</span>
                   <span className="font-medium">{user?.username}</span>
                 </div>
-                
+
                 <div className="flex items-center justify-between py-2 border-b border-slate-100">
                   <span className="text-slate-600">Role</span>
                   <Badge variant={user?.role.name === 'Superadmin' ? 'default' : 'secondary'}>
                     {user?.role.name}
                   </Badge>
                 </div>
-                
+
                 <div className="flex items-center justify-between py-2 border-b border-slate-100">
                   <span className="text-slate-600">Account Created</span>
                   <span className="font-medium">
                     {user?.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'}
                   </span>
                 </div>
-                
+
                 <div className="flex items-center justify-between py-2">
                   <span className="text-slate-600">Last Updated</span>
                   <span className="font-medium">
@@ -107,18 +126,18 @@ export default function ProfilePage() {
                     <span className="text-slate-600">Business Name</span>
                     <span className="font-medium">{user.business.name}</span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between py-2 border-b border-slate-100">
                     <span className="text-slate-600">Business ID</span>
                     <span className="font-medium text-xs bg-slate-100 px-2 py-1 rounded">
                       {user.business.id}
                     </span>
                   </div>
-                  
+
                   <div className="flex items-center justify-between py-2">
                     <span className="text-slate-600">Created</span>
                     <span className="font-medium">
-                      {new Date(user.business.created_at).toLocaleDateString()}
+                      {user.business.created_at ? new Date(user.business.created_at).toLocaleDateString() : 'N/A'}
                     </span>
                   </div>
                 </CardContent>
@@ -141,7 +160,7 @@ export default function ProfilePage() {
                     <AlertDescription className="text-red-700">{error}</AlertDescription>
                   </Alert>
                 )}
-                
+
                 {success && (
                   <Alert className="border-green-200 bg-green-50">
                     <AlertDescription className="text-green-700">{success}</AlertDescription>
@@ -158,9 +177,10 @@ export default function ProfilePage() {
                       onChange={(e) => setCurrentPassword(e.target.value)}
                       required
                       disabled={loading}
+                      autoComplete="current-password"
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="new_password">New Password</Label>
                     <Input
@@ -170,9 +190,11 @@ export default function ProfilePage() {
                       onChange={(e) => setNewPassword(e.target.value)}
                       required
                       disabled={loading}
+                      placeholder="Minimum 8 characters"
+                      autoComplete="new-password"
                     />
                   </div>
-                  
+
                   <div className="space-y-2">
                     <Label htmlFor="confirm_password">Confirm Password</Label>
                     <Input
@@ -182,6 +204,7 @@ export default function ProfilePage() {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
                       disabled={loading}
+                      autoComplete="new-password"
                     />
                   </div>
                 </div>
@@ -205,39 +228,39 @@ export default function ProfilePage() {
           </Card>
 
           {/* Permissions */}
-{user?.role && Array.isArray(user.role.permissions) && user.role.permissions.length > 0 ? (
-  <Card>
-    <CardHeader>
-      <CardTitle className="flex items-center space-x-2">
-        <Shield className="h-5 w-5 text-purple-600" />
-        <span>Permissions</span>
-      </CardTitle>
-    </CardHeader>
-    <CardContent>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {user.role.permissions.map((permission: string, index: number) => (
-          <div key={index} className="flex items-center space-x-2">
-            <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-            <span className="text-slate-700">{permission}</span>
-          </div>
-        ))}
-      </div>
-    </CardContent>
-  </Card>
-) : (
-  <Card>
-    <CardHeader>
-      <CardTitle className="flex items-center space-x-2">
-        <Shield className="h-5 w-5 text-purple-600" />
-        <span>Permissions</span>
-      </CardTitle>
-    </CardHeader>
-    <CardContent>
-      <p className="text-slate-500">No specific permissions assigned for this role.</p>
-    </CardContent>
-  </Card>
-)}
-       </div>
+          {user?.role && Array.isArray(user.role.permissions) && user.role.permissions.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="h-5 w-5 text-purple-600" />
+                  <span>Permissions</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {user.role.permissions.map((permission: string, index: number) => (
+                    <div key={index} className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-slate-700">{permission}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Shield className="h-5 w-5 text-purple-600" />
+                  <span>Permissions</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-slate-500">No specific permissions assigned for this role.</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </DashboardLayout>
     </ProtectedRoute>
   );

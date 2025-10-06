@@ -51,6 +51,7 @@ export default function Navigation() {
           ...baseItems,
           { href: `/sheets/${user.business_id}`, label: 'Sheets', icon: FileSpreadsheet },
           { href: `/stats/${user.business_id}`, label: 'Analytics', icon: BarChart3 },
+          { href: '/users', label: 'Users', icon: Users },
         ];
       case 'User':
         return [

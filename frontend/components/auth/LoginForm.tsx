@@ -10,6 +10,36 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { apiClient } from '@/lib/api';
 import { storeAuth } from '@/lib/auth';
 import { Loader2, LogIn } from 'lucide-react';
+import type { AuthResponse, User as IUser } from '@/types';
+
+type CanonicalRole = 'Superadmin' | 'Business Admin' | 'User';
+
+function canonicalizeRoleName(name: unknown): CanonicalRole {
+  const s = String(name ?? '').toLowerCase();
+  if (s === 'superadmin') return 'Superadmin';
+  if (s === 'business admin') return 'Business Admin';
+  return 'User';
+}
+
+// Keep the returned user compatible with your IUser
+function canonicalizeUser(user: IUser): IUser {
+  const roleName = canonicalizeRoleName(user?.role?.name);
+
+  const canon: IUser = {
+    ...user,
+    id: String(user.id ?? ''),                     // always string
+    business_id: user.business_id != null ? String(user.business_id) : '', // string, never null
+    role_id: Number(user.role_id ?? user.role?.id ?? 0),
+    role: {
+      ...user.role,
+      id: Number(user.role?.id ?? user.role_id ?? 0),
+      name: roleName,
+      permissions: Array.isArray(user.role?.permissions) ? user.role.permissions : [],
+    },
+  };
+
+  return canon;
+}
 
 export default function LoginForm() {
   const [username, setUsername] = useState('');
@@ -20,15 +50,20 @@ export default function LoginForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username.trim() || !password) return;
+
     setLoading(true);
     setError('');
 
     try {
-      const response = await apiClient.login(username, password);
-      storeAuth(response.token, response.user);
-      
-      // Redirect based on role
-      switch (response.user.role.name) {
+      const resp = await apiClient.login(username.trim(), password) as AuthResponse;
+      const canonicalUser = canonicalizeUser(resp.user);
+
+      // console.table(canonicalUser); // optional debug once
+
+      storeAuth(resp.token, canonicalUser);
+
+      switch (canonicalUser.role.name) {
         case 'Superadmin':
           router.push('/dashboard/superadmin');
           break;
@@ -62,7 +97,7 @@ export default function LoginForm() {
             Sign in to your account to continue
           </CardDescription>
         </CardHeader>
-        
+
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-6">
             {error && (
@@ -70,7 +105,7 @@ export default function LoginForm() {
                 <AlertDescription className="text-red-700">{error}</AlertDescription>
               </Alert>
             )}
-            
+
             <div className="space-y-2">
               <Label htmlFor="username" className="text-slate-700 font-medium">Username</Label>
               <Input
@@ -82,9 +117,10 @@ export default function LoginForm() {
                 required
                 className="h-11 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 disabled={loading}
+                autoComplete="username"
               />
             </div>
-            
+
             <div className="space-y-2">
               <Label htmlFor="password" className="text-slate-700 font-medium">Password</Label>
               <Input
@@ -96,15 +132,16 @@ export default function LoginForm() {
                 required
                 className="h-11 border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 disabled={loading}
+                autoComplete="current-password"
               />
             </div>
           </CardContent>
-          
+
           <CardFooter>
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full h-11 bg-gradient-to-r from-blue-600 to-teal-600 hover:from-blue-700 hover:to-teal-700 text-white font-medium transition-all duration-200 shadow-lg hover:shadow-xl"
-              disabled={loading}
+              disabled={loading || !username.trim() || !password}
             >
               {loading ? (
                 <>

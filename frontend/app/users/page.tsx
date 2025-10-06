@@ -27,7 +27,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api';
 import type { Business, User } from '@/types';
-import { ChevronDown, KeyRound, Plus, RefreshCw, Trash2, ShieldAlert, Building2, Sparkles } from 'lucide-react';
+import {
+  ChevronDown, KeyRound, Plus, RefreshCw, Trash2, ShieldAlert,
+  Building2, KeySquare, Pencil, Trash, PlugZap
+} from 'lucide-react';
 
 const ROLE_ID = {
   SUPERADMIN: 7,
@@ -65,14 +68,27 @@ export default function UsersPage() {
   const [qSuper, setQSuper] = useState('');
   const [businesses, setBusinesses] = useState<Business[]>([]);
 
-  // Create dialog
-  const [openCreate, setOpenCreate] = useState(false);
+  // Create USER dialog
+  const [openCreateUser, setOpenCreateUser] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newRoleId, setNewRoleId] = useState<number>(ROLE_ID.USER);
-  const [newBizId, setNewBizId] = useState<string>(''); // for superadmin (existing biz)
-  const [newBizMode, setNewBizMode] = useState<boolean>(false); // one-shot mode
-  const [newBizName, setNewBizName] = useState<string>(''); // new business name
+  const [newBizId, setNewBizId] = useState<string>(''); // superadmin existing business
+
+  // Create BUSINESS dialog (superadmin top button)
+  const [openCreateBiz, setOpenCreateBiz] = useState(false);
+  const [bizName, setBizName] = useState('');
+  const [bmApiKey, setBmApiKey] = useState('');
+  const [bmApiSecret, setBmApiSecret] = useState('');
+
+  // API credentials dialog (edit / BA API+)
+  const [openCreds, setOpenCreds] = useState(false);
+  const [credsBizId, setCredsBizId] = useState<string>('');
+  const [credsBizName, setCredsBizName] = useState<string>('');
+  const [credsKey, setCredsKey] = useState<string>('');     // write
+  const [credsSecret, setCredsSecret] = useState<string>(''); // write
+  const [credsMasked, setCredsMasked] = useState<{ key?: string | null, secret?: string | null } | null>(null);
+  const [credsExists, setCredsExists] = useState<boolean>(false);
 
   // Password dialog
   const [openPassword, setOpenPassword] = useState(false);
@@ -150,100 +166,159 @@ export default function UsersPage() {
     else void loadForBusinessAdmin();
   };
 
-  const resetCreateForm = () => {
+  /** ---------------- Create BUSINESS (Superadmin) ---------------- */
+  const resetCreateBiz = () => {
+    setBizName('');
+    setBmApiKey('');
+    setBmApiSecret('');
+  };
+
+  const handleCreateBusiness = async () => {
+    if (!bizName.trim()) {
+      setError('Please enter a business name.');
+      return;
+    }
+    try {
+      setBusy(true);
+      setError('');
+      const created = await apiClient.createBusiness(bizName.trim());
+      // If optional API key given, upsert credentials
+      if (created?.id && bmApiKey.trim()) {
+        await apiClient.upsertBackMarketCreds(String(created.id), bmApiKey.trim(), bmApiSecret.trim() || undefined);
+      }
+      setOpenCreateBiz(false);
+      resetCreateBiz();
+      onRefresh();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to create business');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** ---------------- USER creation ---------------- */
+  const resetCreateUser = () => {
     setNewUsername('');
     setNewPassword('');
     setNewRoleId(ROLE_ID.USER);
     setNewBizId('');
-    setNewBizMode(false);
-    setNewBizName('');
   };
 
-  const handleCreate = async () => {
+  const handleCreateUser = async () => {
     try {
       setBusy(true);
       setError('');
 
-      // SUPERADMIN: One-shot create (Business + Admin)
-      if (isSuper && newBizMode) {
-        if (!newBizName.trim()) {
-          setError('Please enter a business name.');
-          setBusy(false);
-          return;
-        }
-        if (!newUsername.trim() || newPassword.length < 8) {
-          setError('Provide username and a password with at least 8 characters.');
-          setBusy(false);
-          return;
-        }
-        // One-shot: force role to Business Admin
-        console.log('🧩 Creating new business + admin →', { newBizName, newUsername });
-        await apiClient.createBusiness(newBizName.trim(), {
-          username: newUsername.trim(),
-          password: newPassword,
-        });
-        setOpenCreate(false);
-        resetCreateForm();
-        onRefresh();
+      if (!newUsername.trim() || newPassword.length < 8) {
+        setError('Provide username and a password with at least 8 characters.');
+        setBusy(false);
         return;
       }
 
-      // SUPERADMIN: create user under an existing business
+      // Superadmin = must select business
       if (isSuper) {
         if (!newBizId) {
           setError('Please select a business.');
           setBusy(false);
           return;
         }
-        if (!newUsername.trim() || newPassword.length < 8) {
-          setError('Provide username and a password with at least 8 characters.');
-          setBusy(false);
-          return;
-        }
         const payload = {
           username: newUsername.trim(),
           password: newPassword,
-          role_id: newRoleId, // 8 BA or 9 User
+          role_id: newRoleId, // 8 (BA) or 9 (User)
           business_id: Number(newBizId),
         };
-        console.log('🧩 Creating user under existing business →', payload);
         await apiClient.createUser(payload);
-        setOpenCreate(false);
-        resetCreateForm();
+        setOpenCreateUser(false);
+        resetCreateUser();
         onRefresh();
         return;
       }
 
-      // BUSINESS ADMIN: create user in their own business
-      if (!me?.business_id) {
-        setError('Your account is not linked to a business. Contact an administrator.');
-        setBusy(false);
-        return;
-      }
-      if (!newUsername.trim() || newPassword.length < 8) {
-        setError('Provide username and a password with at least 8 characters.');
-        setBusy(false);
-        return;
-      }
-      const payload = {
+      // Business Admin creates in own business (server enforces scope)
+      await apiClient.createUser({
         username: newUsername.trim(),
         password: newPassword,
-        role_id: newRoleId, // BA or User (server will prevent BA from creating Superadmin anyway)
-        business_id: Number(me.business_id),
-      };
-      console.log('🧩 Creating user (BA scope) →', payload);
-      await apiClient.createUser(payload);
-      setOpenCreate(false);
-      resetCreateForm();
+        role_id: newRoleId,
+      });
+      setOpenCreateUser(false);
+      resetCreateUser();
       onRefresh();
     } catch (e: any) {
-      console.error('❌ Create failed:', e);
-      setError(e?.message || 'Failed to create');
+      setError(e?.message || 'Failed to create user');
     } finally {
       setBusy(false);
     }
   };
 
+  /** ---------------- API Creds dialog ---------------- */
+  const openCredsForBusiness = async (bizId: string, bizName?: string) => {
+    try {
+      setError('');
+      setBusy(true);
+      setCredsBizId(bizId);
+      setCredsBizName(bizName || '');
+      setCredsKey('');
+      setCredsSecret('');
+      setCredsMasked(null);
+      setCredsExists(false);
+
+      const creds = await apiClient.getBackMarketCreds(bizId);
+      // { exists: boolean, api_key_masked?, api_secret_masked? }
+      if (creds?.exists) {
+        setCredsExists(true);
+        setCredsMasked({
+          key: creds.api_key_masked || null,
+          secret: creds.api_secret_masked || null,
+        });
+      } else {
+        setCredsExists(false);
+      }
+      setOpenCreds(true);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load API credentials');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveCreds = async () => {
+    try {
+      setBusy(true);
+      setError('');
+      if (!credsBizId) return;
+
+      if (!credsKey.trim()) {
+        setError('API Key is required to save.');
+        setBusy(false);
+        return;
+      }
+      await apiClient.upsertBackMarketCreds(credsBizId, credsKey.trim(), credsSecret.trim() || undefined);
+      setOpenCreds(false);
+      onRefresh();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to save credentials');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteCreds = async () => {
+    try {
+      setBusy(true);
+      setError('');
+      if (!credsBizId) return;
+      await apiClient.deleteBackMarketCreds(credsBizId);
+      setOpenCreds(false);
+      onRefresh();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to delete credentials');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** ---------------- Password / Delete ---------------- */
   const openPwdFor = (u: User) => {
     setPwdUser(u);
     setPwdNew('');
@@ -294,6 +369,11 @@ export default function UsersPage() {
     }
   };
 
+  // Loading guard (uses ProtectedRoute spinner before)
+  if (authLoading) {
+    return null;
+  }
+
   return (
     <ProtectedRoute requiredRole="User">
       <DashboardLayout>
@@ -305,13 +385,90 @@ export default function UsersPage() {
                 {isSuper ? 'All businesses grouped by Business Admin' : 'Users in your business'}
               </p>
             </div>
+
             <div className="flex items-center gap-2">
+              {/* Business Admin: API + button */}
+              {!isSuper && (
+                <Button
+                  variant="outline"
+                  onClick={() => openCredsForBusiness(String(me?.business_id || ''), me?.business?.name)}
+                  title="Manage Back Market API credentials"
+                >
+                  <PlugZap className="h-4 w-4 mr-2" />
+                  API +
+                </Button>
+              )}
+
+              {/* Refresh */}
               <Button variant="outline" onClick={onRefresh}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
               </Button>
 
-              <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+              {/* Superadmin: New Business */}
+              {isSuper && (
+                <Dialog open={openCreateBiz} onOpenChange={setOpenCreateBiz}>
+                  <DialogTrigger asChild>
+                    <Button>
+                      <Building2 className="h-4 w-4 mr-2" />
+                      New Business
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Create Business</DialogTitle>
+                      <DialogDescription>
+                        Business name is required. Back Market API credentials are optional and can be added later.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="grid gap-4 py-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="bizName">Business Name</Label>
+                        <Input
+                          id="bizName"
+                          value={bizName}
+                          onChange={(e) => setBizName(e.target.value)}
+                          placeholder="e.g. Acme Phones LLC"
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Back Market API Key (optional)</Label>
+                        <Input
+                          value={bmApiKey}
+                          onChange={(e) => setBmApiKey(e.target.value)}
+                          placeholder="Enter API key (optional)"
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Back Market API Secret (optional)</Label>
+                        <Input
+                          value={bmApiSecret}
+                          onChange={(e) => setBmApiSecret(e.target.value)}
+                          placeholder="Enter API secret (optional)"
+                        />
+                      </div>
+                    </div>
+
+                    <DialogFooter>
+                      <DialogClose asChild>
+                        <Button variant="outline">Cancel</Button>
+                      </DialogClose>
+                      <Button
+                        onClick={handleCreateBusiness}
+                        disabled={busy || !bizName.trim()}
+                      >
+                        Create Business
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
+
+              {/* New User */}
+              <Dialog open={openCreateUser} onOpenChange={setOpenCreateUser}>
                 <DialogTrigger asChild>
                   <Button>
                     <Plus className="h-4 w-4 mr-2" />
@@ -320,73 +477,30 @@ export default function UsersPage() {
                 </DialogTrigger>
                 <DialogContent>
                   <DialogHeader>
-                    <DialogTitle>
-                      {isSuper
-                        ? 'Create user (or one-shot create business + admin)'
-                        : 'Create user'}
-                    </DialogTitle>
+                    <DialogTitle>Create user</DialogTitle>
                     <DialogDescription>
-                      {isSuper
-                        ? 'Pick an existing business, or click “Add new business” to create a business and its Business Admin in one step.'
-                        : 'Provide username, password and role.'}
+                      Provide username, password and role. Superadmin must select a business.
                     </DialogDescription>
                   </DialogHeader>
 
                   <div className="grid gap-4 py-2">
                     {isSuper && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label className="font-medium">Business</Label>
-                          <Button
-                            type="button"
-                            variant={newBizMode ? 'default' : 'outline'}
-                            size="sm"
-                            onClick={() => setNewBizMode((v) => !v)}
-                          >
-                            {newBizMode ? (
-                              <>
-                                <Building2 className="h-4 w-4 mr-1" />
-                                Cancel new business
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="h-4 w-4 mr-1" />
-                                + Add new business
-                              </>
-                            )}
-                          </Button>
-                        </div>
-
-                        {!newBizMode ? (
-                          <Select value={newBizId} onValueChange={setNewBizId}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select business" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {businesses.map((b) => (
-                                <SelectItem key={b.id} value={String(b.id)}>
-                                  {b.name} (ID {b.id})
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div className="grid gap-2">
-                            <Label htmlFor="bizName">Business Name</Label>
-                            <Input
-                              id="bizName"
-                              value={newBizName}
-                              onChange={(e) => setNewBizName(e.target.value)}
-                              placeholder="e.g. Acme Phones LLC"
-                            />
-                            <p className="text-xs text-slate-500">
-                              This will create the business and a Business Admin in one step.
-                            </p>
-                          </div>
-                        )}
+                      <div className="grid gap-2">
+                        <Label>Business</Label>
+                        <Select value={newBizId} onValueChange={setNewBizId}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select business" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {businesses.map((b) => (
+                              <SelectItem key={b.id} value={String(b.id)}>
+                                {b.name} (ID {b.id})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
                     )}
-
                     <div className="grid gap-2">
                       <Label htmlFor="username">Username</Label>
                       <Input
@@ -396,7 +510,6 @@ export default function UsersPage() {
                         placeholder="jane.doe"
                       />
                     </div>
-
                     <div className="grid gap-2">
                       <Label htmlFor="password">Password</Label>
                       <Input
@@ -407,22 +520,9 @@ export default function UsersPage() {
                         placeholder="Minimum 8 characters"
                       />
                     </div>
-
-                    {/* Role selection:
-                        - Superadmin + newBizMode: force Business Admin (one-shot)
-                        - Otherwise: allow BA/User
-                    */}
                     <div className="grid gap-2">
                       <Label>Role</Label>
-                      <Select
-                        value={
-                          isSuper && newBizMode
-                            ? String(ROLE_ID.BUSINESS_ADMIN)
-                            : String(newRoleId)
-                        }
-                        onValueChange={(v) => setNewRoleId(Number(v))}
-                        disabled={isSuper && newBizMode}
-                      >
+                      <Select value={String(newRoleId)} onValueChange={(v) => setNewRoleId(Number(v))}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select role" />
                         </SelectTrigger>
@@ -431,11 +531,6 @@ export default function UsersPage() {
                           <SelectItem value={String(ROLE_ID.USER)}>User</SelectItem>
                         </SelectContent>
                       </Select>
-                      {isSuper && newBizMode && (
-                        <p className="text-xs text-slate-500">
-                          One-shot creation always creates a <b>Business Admin</b>.
-                        </p>
-                      )}
                     </div>
                   </div>
 
@@ -444,16 +539,15 @@ export default function UsersPage() {
                       <Button variant="outline">Cancel</Button>
                     </DialogClose>
                     <Button
-                      onClick={handleCreate}
+                      onClick={handleCreateUser}
                       disabled={
                         busy ||
                         !newUsername.trim() ||
                         newPassword.length < 8 ||
-                        (isSuper && !newBizMode && !newBizId) ||
-                        (isSuper && newBizMode && !newBizName.trim())
+                        (isSuper && !newBizId)
                       }
                     >
-                      {isSuper && newBizMode ? 'Create Business + Admin' : 'Create'}
+                      Create
                     </Button>
                   </DialogFooter>
                 </DialogContent>
@@ -533,13 +627,25 @@ export default function UsersPage() {
                               </CardTitle>
                             </div>
                             <div className="flex items-center gap-3">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openCredsForBusiness(String(g.business.id), g.business.name);
+                                }}
+                                title="Edit Back Market API credentials"
+                              >
+                                <KeySquare className="h-4 w-4 mr-1" />
+                                Edit API
+                              </Button>
                               {g.businessAdmin ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 border border-blue-200">
                                   <ShieldAlert className="h-3.5 w-3.5" />
                                   Business Admin: {g.businessAdmin.username}
                                 </span>
                               ) : (
-                                <span className="text-xs text-slate-500">No Business Admin found</span>
+                                <span className="text-xs text-slate-500"></span>
                               )}
                             </div>
                           </div>
@@ -609,7 +715,7 @@ export default function UsersPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Delete Dialog */}
+        {/* Delete User Dialog */}
         <Dialog open={openDelete} onOpenChange={setOpenDelete}>
           <DialogContent>
             <DialogHeader>
@@ -631,12 +737,74 @@ export default function UsersPage() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        {/* Back Market API Credentials Dialog */}
+        <Dialog open={openCreds} onOpenChange={setOpenCreds}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                Back Market API {credsBizName ? `— ${credsBizName}` : ''}
+              </DialogTitle>
+              <DialogDescription>
+                Add or update credentials. Deleting removes them entirely.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid gap-4 py-2">
+              {credsExists && credsMasked && (
+                <div className="rounded-md border p-3 text-sm bg-slate-50">
+                  <div className="mb-1 text-slate-600">Current (masked):</div>
+                  <div>API Key: <span className="font-mono">{credsMasked.key || '—'}</span></div>
+                  <div>API Secret: <span className="font-mono">{credsMasked.secret || '—'}</span></div>
+                </div>
+              )}
+
+              <div className="grid gap-2">
+                <Label>API Key {credsExists ? '(leave empty to keep current)' : '(required to save)'}</Label>
+                <Input
+                  value={credsKey}
+                  onChange={(e) => setCredsKey(e.target.value)}
+                  placeholder={credsExists ? '••••• (optional if not changing)' : 'Enter API key'}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>API Secret (optional)</Label>
+                <Input
+                  value={credsSecret}
+                  onChange={(e) => setCredsSecret(e.target.value)}
+                  placeholder={credsExists ? '••••• (optional if not changing)' : 'Enter API secret (optional)'}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="justify-between">
+              <div>
+                {credsExists && (
+                  <Button variant="destructive" onClick={handleDeleteCreds} disabled={busy}>
+                    <Trash className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <DialogClose asChild>
+                  <Button variant="outline">Close</Button>
+                </DialogClose>
+                <Button onClick={handleSaveCreds} disabled={busy || (!credsKey.trim() && !credsExists)}>
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Save
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </DashboardLayout>
     </ProtectedRoute>
   );
 }
 
-// Reusable users table with BA highlight and actions
+/** ---------- Reusable Users Table ---------- */
 function UsersTable({
   users,
   meId,
