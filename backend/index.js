@@ -1,7 +1,11 @@
 // app.js
 const express = require("express");
 const cors = require("cors");
-require("dotenv").config();
+
+// Load environment variables (Vercel handles this automatically)
+if (process.env.NODE_ENV !== 'production') {
+  require("dotenv").config();
+}
 
 const authRoutes = require("./routes/auth");                  
 const businessRoutes = require("./routes/business");          
@@ -60,10 +64,7 @@ app.use("/api", backmarketCredsRoutes);
 const initRoutes = require("./routes/init");
 app.use("/api/init", initRoutes);
 
-// Handle OPTIONS requests explicitly
-app.options('*', (req, res) => {
-  res.status(200).end();
-});
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {
