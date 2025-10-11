@@ -1,8 +1,8 @@
 module.exports = {
   ROLE: {
-    SUPER_ADMIN: 7,
-    BUSINESS_ADMIN: 8,
-    USER: 9
+    SUPER_ADMIN: 1,
+    BUSINESS_ADMIN: 2,
+    USER: 3
   },
   ROLE_LABELS: {
     SuperAdmin: "Superadmin",
