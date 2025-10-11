@@ -20,7 +20,7 @@ const getBusinessById = async (id) => {
 
 const updateBusinessCurrency = async (id, { currency_code, currency_symbol }) => {
   const result = await pool.query(
-    'UPDATE businesses SET currency_code = $1, currency_symbol = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3 RETURNING *',
+    'UPDATE businesses SET currency_code = $1, currency_symbol = $2 WHERE id = $3 RETURNING *',
     [currency_code, currency_symbol, id]
   );
   return result.rows[0];
