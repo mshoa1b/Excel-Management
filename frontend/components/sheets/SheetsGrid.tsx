@@ -26,6 +26,7 @@ import { Plus, Trash2, RotateCcw, Search, Calendar } from 'lucide-react';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
 import { useCurrency } from '@/hooks/useCurrency';
+import { apiClient } from '@/lib/api';
 import { format } from 'date-fns';
 
 export interface SheetRecord {
@@ -60,7 +61,6 @@ export interface SheetRecord {
   manager_notes: string;
 }
 
-const staffOptions = ['Alice', 'Bob', 'Charlie'];
 const blockedByOptions = [
   'Choose','','PIN Required','Code Required','Apple ID Required','Google ID Required',
   'Awaiting Part','Awaiting Replacement','Awaiting Customer','Awaiting BM','Awaiting G&I','Awaiting Techezm'
@@ -209,6 +209,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   const apiRef = useRef<GridApi<SheetRecord> | null>(null);
   const [rowData, setRowData] = useState<SheetRecord[]>([]);
   const [filteredData, setFilteredData] = useState<SheetRecord[]>([]);
+  const [staffOptions, setStaffOptions] = useState<string[]>(['Choose']);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
@@ -335,6 +336,19 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     setTotals(t);
   }, []);
 
+  // Load staff options
+  const loadStaffOptions = useCallback(async () => {
+    try {
+      const users = await apiClient.getBusinessUsers(Number(businessId));
+      const usernames = users.map((user: any) => user.username);
+      setStaffOptions(['Choose', ...usernames]);
+    } catch (error) {
+      console.error('Failed to load staff options:', error);
+      // Keep default options on error
+      setStaffOptions(['Choose']);
+    }
+  }, [businessId]);
+
   // Load
   const refresh = useCallback(async () => {
     const data = await listSheets(businessId);
@@ -360,7 +374,10 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     }, 0);
   }, [businessId, autoSizeNonMultiline, reflowAutoHeight, recomputeTodayTotals]);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => { 
+    loadStaffOptions();
+    refresh(); 
+  }, [loadStaffOptions, refresh]);
 
   // Date range filtering
   const handleDateRangeFilter = useCallback(async () => {
@@ -756,7 +773,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         ),
       },
     ],
-    [businessId, refresh]
+    [businessId, refresh, staffOptions, formatCurrency]
   );
 
   // Grid events
