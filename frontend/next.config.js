@@ -10,17 +10,17 @@ const nextConfig = {
     unoptimized: true 
   },
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || '/api',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api'),
   },
   async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: process.env.NODE_ENV === 'production' 
-          ? '/api/:path*'  // In production, Vercel handles this
-          : 'http://localhost:5000/api/:path*'  // In development, proxy to backend
-      }
-    ];
+    return process.env.NODE_ENV === 'production' 
+      ? [] // No rewrites in production, let Vercel handle it
+      : [
+          {
+            source: '/api/:path*',
+            destination: 'http://localhost:5000/api/:path*'  // In development, proxy to backend
+          }
+        ];
   },
 };
 
