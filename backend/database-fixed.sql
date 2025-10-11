@@ -87,12 +87,24 @@ CREATE TABLE sheets (
 );
 
 -- ===========================================
+-- BACKMARKET CREDENTIALS TABLE
+-- ===========================================
+CREATE TABLE backmarket_credentials (
+    business_id    INT PRIMARY KEY REFERENCES businesses(id) ON DELETE CASCADE,
+    api_key_enc    TEXT NOT NULL,        -- AES-256-GCM encrypted (base64)
+    api_secret_enc TEXT,                 -- optional AES-256-GCM encrypted (base64)
+    updated_by     INT REFERENCES users(id),
+    updated_at     TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ===========================================
 -- INDEXES FOR PERFORMANCE
 -- ===========================================
 CREATE INDEX idx_sheets_business_id ON sheets(business_id);
 CREATE INDEX idx_sheets_date_received ON sheets(date_received);
 CREATE INDEX idx_users_business_id ON users(business_id);
+CREATE INDEX idx_bmcreds_updated_by ON backmarket_credentials(updated_by);
 
 -- ===========================================
--- DONE - Now your seed.js should work!
+-- DONE - Complete schema with all tables!
 -- ===========================================
