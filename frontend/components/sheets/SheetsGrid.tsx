@@ -22,7 +22,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, RotateCcw, Search, Calendar } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip } from 'lucide-react';
+import { AttachmentManager } from './AttachmentManager';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -222,6 +223,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   const [totals, setTotals] = useState<{ amazon: number; backmarket: number; total: number }>({
     amazon: 0, backmarket: 0, total: 0
   });
+  const [attachmentCounts, setAttachmentCounts] = useState<{ [sheetId: number]: number }>({});
 
   // Smart search and platform filtering
   useEffect(() => {
@@ -349,6 +351,24 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     }
   }, [businessId]);
 
+  // Load attachment counts for all sheets
+  const loadAttachmentCounts = useCallback(async (sheets: SheetRecord[]) => {
+    const counts: { [sheetId: number]: number } = {};
+    
+    // Load attachment counts for each sheet
+    await Promise.all(
+      sheets.map(async (sheet) => {
+        try {
+          const attachments = await apiClient.getAttachments(sheet.id);
+          counts[sheet.id] = attachments.length;
+        } catch (error) {
+          counts[sheet.id] = 0; // Default to 0 on error
+        }
+      })
+    );
+    
+    setAttachmentCounts(counts);
+  }, []);
   // Load
   const refresh = useCallback(async () => {
     const data = await listSheets(businessId);
@@ -367,12 +387,15 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       : [];
     setRowData(formatted);
     recomputeTodayTotals(formatted);
+    
+    // Load attachment counts
+    loadAttachmentCounts(formatted);
 
     setTimeout(() => {
       autoSizeNonMultiline();
       reflowAutoHeight();
     }, 0);
-  }, [businessId, autoSizeNonMultiline, reflowAutoHeight, recomputeTodayTotals]);
+  }, [businessId, autoSizeNonMultiline, reflowAutoHeight, recomputeTodayTotals, loadAttachmentCounts]);
 
   useEffect(() => { 
     loadStaffOptions();
@@ -757,11 +780,34 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       { headerName: 'Manager Notes', field: 'manager_notes', editable: true, wrapText: true, autoHeight: true, width: 260 },
 
       {
-        headerName: '',
+        headerName: 'Actions',
         pinned: 'right',
-        width: 80,
+        width: 120,
         cellRenderer: (p: any) => (
-          <div className="flex justify-end pr-1">
+          <div className="flex justify-end gap-1 pr-1">
+            <div className="relative">
+              <AttachmentManager 
+                sheetId={p.data?.id} 
+                onAttachmentChange={() => {
+                  // Refresh attachment count for this row
+                  if (p.data?.id) {
+                    apiClient.getAttachments(p.data.id).then(attachments => {
+                      setAttachmentCounts(prev => ({
+                        ...prev,
+                        [p.data.id]: attachments.length
+                      }));
+                    }).catch(() => {
+                      // Ignore errors for count updates
+                    });
+                  }
+                }}
+              />
+              {attachmentCounts[p.data?.id] > 0 && (
+                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
+                  {attachmentCounts[p.data?.id]}
+                </span>
+              )}
+            </div>
             <button
               className="rounded-md px-2 py-1 text-red-600 hover:bg-red-50"
               onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
@@ -773,7 +819,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         ),
       },
     ],
-    [businessId, refresh, staffOptions, formatCurrency]
+    [businessId, refresh, staffOptions, formatCurrency, attachmentCounts]
   );
 
   // Grid events
