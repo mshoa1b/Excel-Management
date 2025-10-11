@@ -33,9 +33,9 @@ import {
 } from 'lucide-react';
 
 const ROLE_ID = {
-  SUPERADMIN: 7,
-  BUSINESS_ADMIN: 8,
-  USER: 9,
+  SUPERADMIN: 1,
+  BUSINESS_ADMIN: 2,
+  USER: 3,
 } as const;
 
 type Group = {
@@ -225,7 +225,7 @@ export default function UsersPage() {
         const payload = {
           username: newUsername.trim(),
           password: newPassword,
-          role_id: newRoleId, // 8 (BA) or 9 (User)
+          role_id: newRoleId, // 2 (BA) or 3 (User)
           business_id: Number(newBizId),
         };
         await apiClient.createUser(payload);
