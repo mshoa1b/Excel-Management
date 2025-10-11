@@ -13,7 +13,8 @@ const usersRoutes = require("./routes/users");
 const sheetsRoutes = require("./routes/sheets");
 const statsRoutes = require("./routes/stats");
 const bmOrdersRoutes = require("./routes/bmOrders");
-const backmarketCredsRoutes = require("./routes/backmarket"); 
+const backmarketCredsRoutes = require("./routes/backmarket");
+const attachmentRoutes = require("./routes/attachments"); 
 
 const app = express();
 
@@ -55,6 +56,7 @@ app.get("/api", (_req, res) => {
       "/api/sheets",
       "/api/stats",
       "/api/bmOrders",
+      "/api/attachments",
       "/api/init"
     ]
   });
@@ -75,6 +77,7 @@ app.use("/api/users", usersRoutes);
 app.use("/api/sheets", sheetsRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/bmOrders", bmOrdersRoutes);
+app.use("/api/attachments", attachmentRoutes);
 
 app.use("/api", backmarketCredsRoutes);
 

@@ -181,6 +181,39 @@ class ApiClient {
     const q = businessIdForSuperAdmin ? `?businessId=${businessIdForSuperAdmin}` : "";
     return this.request(`/bmOrders/${orderNumber}${q}`);
   }
+
+  // -------- Attachments --------
+  uploadAttachments(sheetId: number, files: FileList | File[]) {
+    const formData = new FormData();
+    Array.from(files).forEach(file => {
+      formData.append('files', file);
+    });
+    
+    return this.request(`/attachments/upload/${sheetId}`, {
+      method: "POST",
+      body: formData,
+      // Don't set Content-Type header - let browser set it with boundary
+      headers: {}
+    });
+  }
+
+  getAttachments(sheetId: number) {
+    return this.request(`/attachments/sheet/${sheetId}`);
+  }
+
+  deleteAttachment(attachmentId: number) {
+    return this.request(`/attachments/${attachmentId}`, { method: "DELETE" });
+  }
+
+  getAttachmentViewUrl(attachmentId: number) {
+    const baseUrl = getApiBaseUrl().replace('/api', '');
+    return `${baseUrl}/api/attachments/view/${attachmentId}`;
+  }
+
+  getAttachmentDownloadUrl(attachmentId: number) {
+    const baseUrl = getApiBaseUrl().replace('/api', '');
+    return `${baseUrl}/api/attachments/download/${attachmentId}`;
+  }
 }
 
 export const apiClient = new ApiClient();
