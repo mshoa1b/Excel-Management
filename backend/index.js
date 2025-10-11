@@ -23,8 +23,20 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json()); 
 
-// Health
-app.get("/", (_req, res) => res.send("SaaS Backend is running"));
+// Health check with environment info
+app.get("/", (_req, res) => {
+  const envCheck = {
+    status: "SaaS Backend is running",
+    timestamp: new Date().toISOString(),
+    env: {
+      NODE_ENV: process.env.NODE_ENV,
+      JWT_SECRET: process.env.JWT_SECRET ? "✅ Set" : "❌ Missing",
+      DATABASE_URL: process.env.DATABASE_URL ? "✅ Set" : "❌ Missing",
+      CORS_ORIGIN: process.env.CORS_ORIGIN || "Not set"
+    }
+  };
+  res.json(envCheck);
+});
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
@@ -51,6 +63,16 @@ app.use("/api/init", initRoutes);
 // Handle OPTIONS requests explicitly
 app.options('*', (req, res) => {
   res.status(200).end();
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('❌ Server Error:', err);
+  res.status(500).json({ 
+    error: 'Internal Server Error',
+    message: err.message,
+    timestamp: new Date().toISOString()
+  });
 });
 
 app.use((req, res) => {

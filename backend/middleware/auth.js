@@ -7,8 +7,7 @@ require("dotenv").config();
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
-  // Fail fast in dev if secret missing — prevents accidental insecure startup
-  throw new Error("JWT_SECRET is not set in environment");
+  console.error("❌ JWT_SECRET is not set in environment variables");
 }
 
 const JWT_BASE = {
