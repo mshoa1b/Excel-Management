@@ -58,7 +58,18 @@ export default function ProtectedRoute({ children, requiredRole, businessId }: P
     if (roleName === 'Superadmin') return true;
 
     // If page is business-scoped, BA/User must match that business
-    if (normRouteBizId) return normUserBizId === normRouteBizId;
+    if (normRouteBizId) {
+      const hasAccess = normUserBizId === normRouteBizId;
+      console.log('ProtectedRoute Access Check:', {
+        requiredRole,
+        roleName,
+        normRouteBizId,
+        normUserBizId,
+        hasAccess,
+        user: user ? { id: user.id, business_id: user.business_id, role: user.role } : null
+      });
+      return hasAccess;
+    }
 
     // Otherwise any logged-in user is fine
     return true;
