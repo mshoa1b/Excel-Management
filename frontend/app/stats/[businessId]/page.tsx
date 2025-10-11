@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiClient } from '@/lib/api';
@@ -21,9 +22,19 @@ import {
 export default function StatsPage() {
   const params = useParams();
   const businessId = params.businessId as string;
+  const { user } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedRange, setSelectedRange] = useState('1m');
+
+  // Debug logging
+  console.log('Stats Page Debug:', {
+    params,
+    businessId,
+    userBusinessId: user?.business_id,
+    userRole: user?.role?.name,
+    userId: user?.id
+  });
 
   useEffect(() => {
     loadStats();
@@ -69,6 +80,11 @@ export default function StatsPage() {
     <ProtectedRoute businessId={businessId}>
       <DashboardLayout>
         <div className="space-y-8">
+          {/* Debug Info */}
+          <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-xs">
+            <strong>Debug Info:</strong> Route businessId: {businessId}, User businessId: {user?.business_id}, Role: {user?.role?.name}
+          </div>
+          
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-slate-800 mb-2">Analytics Dashboard</h1>

@@ -27,7 +27,7 @@ const JWT_VERIFY_OPTS = { ...JWT_BASE, algorithms: ["HS256"] };
 const shapeUser = (r) => ({
   id: r.id,
   username: r.username,
-  business_id: r.business_id,
+  business_id: r.business_id ? String(r.business_id) : null,
   role: {
     id: r.role_id,
     name: r.role_name ? (ROLE_LABELS[r.role_name] || r.role_name) : "User"
@@ -105,7 +105,7 @@ router.post("/login", async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
-        business_id: user.business_id ?? null,
+        business_id: user.business_id ? String(user.business_id) : null,
         role: { 
           id: user.role_id,
           name: roleForFrontend 
