@@ -25,6 +25,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Plus, Trash2, RotateCcw, Search, Calendar } from 'lucide-react';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
+import { useCurrency } from '@/hooks/useCurrency';
 import { format } from 'date-fns';
 
 export interface SheetRecord {
@@ -204,6 +205,7 @@ const colorForRow = (r?: SheetRecord): string => {
 /** ==================================== **/
 
 export default function SheetsGrid({ businessId }: { businessId: string }) {
+  const { formatCurrency } = useCurrency(businessId);
   const apiRef = useRef<GridApi<SheetRecord> | null>(null);
   const [rowData, setRowData] = useState<SheetRecord[]>([]);
   const [filteredData, setFilteredData] = useState<SheetRecord[]>([]);
@@ -704,7 +706,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
       { headerName: 'Resolution', field: 'resolution', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Back in stock','Sent repaired back to customer','Sent back to customer','Sent replacement','Sent back to supplier','BER'] }, minWidth: 160 },
 
-      { headerName: 'Refund Amount', field: 'refund_amount', editable: true, valueFormatter: (p) => typeof p.value === 'number' ? `$${p.value.toFixed(2)}` : '$0.00', valueParser: numberParser, minWidth: 130 },
+      { headerName: 'Refund Amount', field: 'refund_amount', editable: true, valueFormatter: (p) => typeof p.value === 'number' ? formatCurrency(p.value) : formatCurrency(0), valueParser: numberParser, minWidth: 130 },
 
       { headerName: 'Refund Date', field: 'refund_date', editable: true, 
         cellEditor: DateCellEditor,
@@ -907,15 +909,15 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       <div className="flex flex-wrap gap-4 text-gray-800 font-medium mb-2">
         <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-md shadow-sm">
           <span className="text-blue-700 font-semibold">Amazon Refunds (Today):</span>
-          <span className="text-lg font-bold text-blue-800">${totals.amazon.toFixed(2)}</span>
+          <span className="text-lg font-bold text-blue-800">{formatCurrency(totals.amazon)}</span>
         </div>
         <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-md shadow-sm">
           <span className="text-green-700 font-semibold">Back Market Refunds (Today):</span>
-          <span className="text-lg font-bold text-green-800">${totals.backmarket.toFixed(2)}</span>
+          <span className="text-lg font-bold text-green-800">{formatCurrency(totals.backmarket)}</span>
         </div>
         <div className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-md shadow-sm">
           <span className="text-slate-700 font-semibold">Total Refunds (All Marketplaces):</span>
-          <span className="text-lg font-bold text-slate-900">${totals.total.toFixed(2)}</span>
+          <span className="text-lg font-bold text-slate-900">{formatCurrency(totals.total)}</span>
         </div>
       </div>
 

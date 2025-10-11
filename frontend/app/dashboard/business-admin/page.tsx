@@ -5,17 +5,20 @@ import Link from 'next/link';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
+import CurrencySettings from '@/components/business/CurrencySettings';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
+import { useCurrency } from '@/hooks/useCurrency';
 import { apiClient } from '@/lib/api';
 import type { Stats, Sheet } from '@/types';
 import { FileSpreadsheet, DollarSign, TrendingUp, Calendar, ArrowRight } from 'lucide-react';
 
-const currency = new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' });
+
 
 export default function BusinessAdminDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { formatCurrency } = useCurrency(user?.business_id || '');
   const [stats, setStats] = useState<Stats | null>(null);
   const [recentSheets, setRecentSheets] = useState<Sheet[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -96,13 +99,13 @@ export default function BusinessAdminDashboard() {
               />
               <StatsCard
                 title="Total Refunds"
-                value={currency.format(Number(stats.totalRefundAmount ?? 0))}
+                value={formatCurrency(Number(stats.totalRefundAmount ?? 0))}
                 description="This period"
                 icon={DollarSign}
               />
               <StatsCard
                 title="Average Refund"
-                value={currency.format(Number(stats.averageRefundAmount ?? 0))}
+                value={formatCurrency(Number(stats.averageRefundAmount ?? 0))}
                 description="Per order"
                 icon={TrendingUp}
               />
@@ -154,6 +157,11 @@ export default function BusinessAdminDashboard() {
             </Card>
           </div>
 
+          {/* Currency Settings */}
+          {bizId && (
+            <CurrencySettings businessId={bizId} />
+          )}
+
           {/* Recent Sheets */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -181,7 +189,7 @@ export default function BusinessAdminDashboard() {
                           <p className="text-sm text-slate-500">{sheet.customer_name || '—'}</p>
                         </div>
                         <div className="text-right">
-                          <p className="font-medium text-slate-800">{currency.format(refund)}</p>
+                          <p className="font-medium text-slate-800">{formatCurrency(refund)}</p>
                           <p className="text-sm text-slate-500">{sheet.return_type || '—'}</p>
                         </div>
                       </div>
