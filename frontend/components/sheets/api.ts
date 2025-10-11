@@ -1,8 +1,25 @@
 import type { SheetRecord } from './types';
 
-const API_BASE = typeof window !== 'undefined' 
-  ? ''  // Use empty base since backend routes already include /api
-  : 'http://localhost:5000';  // Fallback for SSR
+// Use environment variable for API base URL with proper fallbacks
+const getApiBaseUrl = () => {
+  // First try the environment variable (available at build time and runtime)
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  
+  // Fallback logic for development vs production
+  if (typeof window !== 'undefined') {
+    // Client-side: check if we're in production
+    return window.location.hostname.includes('vercel.app') 
+      ? 'https://excel-management-backend.vercel.app/api'
+      : '/api'; // Local development
+  }
+  
+  // Server-side rendering fallback
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE = getApiBaseUrl();
 
 async function request(path: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -32,28 +49,28 @@ async function request(path: string, options: RequestInit = {}) {
 
 // -------------------- Sheet CRUD API --------------------
 export const listSheets = (businessId: string): Promise<SheetRecord[]> =>
-  request(`/api/sheets/${businessId}`);
+  request(`/sheets/${businessId}`);
 
 export const createSheet = (businessId: string, payload: Partial<SheetRecord>) =>
-  request(`/api/sheets/${businessId}`, { method: 'POST', body: JSON.stringify(payload) });
+  request(`/sheets/${businessId}`, { method: 'POST', body: JSON.stringify(payload) });
 
 export const updateSheet = (businessId: string, payload: Partial<SheetRecord> & { id: number }) =>
-  request(`/api/sheets/${businessId}`, { method: 'PUT', body: JSON.stringify(payload) });
+  request(`/sheets/${businessId}`, { method: 'PUT', body: JSON.stringify(payload) });
 
 export const deleteSheet = (businessId: string, id: number) =>
-  request(`/api/sheets/${businessId}`, { method: 'DELETE', body: JSON.stringify({ id }) });
+  request(`/sheets/${businessId}`, { method: 'DELETE', body: JSON.stringify({ id }) });
 
 export const searchSheets = (businessId: string, searchTerm: string): Promise<SheetRecord[]> =>
-  request(`/api/sheets/${businessId}/search?q=${encodeURIComponent(searchTerm)}`);
+  request(`/sheets/${businessId}/search?q=${encodeURIComponent(searchTerm)}`);
 
 export const getSheetsByDateRange = (businessId: string, dateFrom: string, dateTo: string): Promise<SheetRecord[]> =>
-  request(`/api/sheets/${businessId}/daterange?from=${dateFrom}&to=${dateTo}`);
+  request(`/sheets/${businessId}/daterange?from=${dateFrom}&to=${dateTo}`);
 
 // -------------------- BackMarket API via Backend --------------------
 export async function fetchBMOrder(orderNo: string) {
   if (!orderNo || orderNo.length !== 8) throw new Error('Invalid BackMarket order number');
 
   // Call your backend proxy route
-  const data = await request(`/api/bmOrders/${orderNo}`);
+  const data = await request(`/bmOrders/${orderNo}`);
   return data;
 }
