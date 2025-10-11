@@ -20,13 +20,31 @@ const app = express();
 
 // Middlewares
 const corsOptions = {
-  origin: process.env.CORS_ORIGIN?.split(",") || true,
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = process.env.CORS_ORIGIN?.split(",") || [
+      'http://localhost:3000',
+      'https://excel-management-rho.vercel.app'
+    ];
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 };
 app.use(cors(corsOptions));
 app.use(express.json()); 
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
 
 // Health check with environment info
 app.get("/", (_req, res) => {
