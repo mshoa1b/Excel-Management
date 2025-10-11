@@ -1,15 +1,14 @@
 {
+  "_comment": "This file is for reference only - use separate projects",
   "version": 2,
   "builds": [
     {
-      "src": "api/index.js",
-      "use": "@vercel/node@latest"
-    }
-  ],
-  "routes": [
+      "src": "frontend/package.json", 
+      "use": "@vercel/next"
+    },
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index.js"
+      "src": "api/index.js",
+      "use": "@vercel/node"
     }
   ]
 }
