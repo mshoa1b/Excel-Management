@@ -42,6 +42,24 @@ app.get("/", (_req, res) => {
   res.json(envCheck);
 });
 
+// API base route
+app.get("/api", (_req, res) => {
+  res.json({
+    status: "API is running",
+    timestamp: new Date().toISOString(),
+    version: "1.0.0",
+    endpoints: [
+      "/api/auth",
+      "/api/businesses", 
+      "/api/users",
+      "/api/sheets",
+      "/api/stats",
+      "/api/bmOrders",
+      "/api/init"
+    ]
+  });
+});
+
 // Debug middleware to log all requests
 app.use((req, res, next) => {
   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
