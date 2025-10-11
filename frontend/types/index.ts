@@ -19,6 +19,8 @@ export interface Business {
   id: string;
   name: string;
   owner_id: string;
+  currency_code?: string;
+  currency_symbol?: string;
   created_at: string;
   updated_at: string;
 }

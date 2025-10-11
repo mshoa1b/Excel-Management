@@ -26,6 +26,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api';
+import { COMMON_CURRENCIES } from '@/hooks/useCurrency';
 import type { Business, User } from '@/types';
 import {
   ChevronDown, KeyRound, Plus, RefreshCw, Trash2, ShieldAlert,
@@ -99,6 +100,13 @@ export default function UsersPage() {
   // Delete dialog
   const [openDelete, setOpenDelete] = useState(false);
   const [delUser, setDelUser] = useState<User | null>(null);
+
+  // Edit business dialog
+  const [openEditBiz, setOpenEditBiz] = useState(false);
+  const [editBusiness, setEditBusiness] = useState<Business | null>(null);
+  const [editBizName, setEditBizName] = useState('');
+  const [editCurrencyCode, setEditCurrencyCode] = useState('');
+  const [editCurrencySymbol, setEditCurrencySymbol] = useState('');
 
   const loadForBusinessAdmin = useCallback(async () => {
     setError('');
@@ -313,6 +321,60 @@ export default function UsersPage() {
       onRefresh();
     } catch (e: any) {
       setError(e?.message || 'Failed to delete credentials');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** ---------------- Edit Business ---------------- */
+  const openEditBusiness = async (business: Business) => {
+    try {
+      setError('');
+      setBusy(true);
+      
+      // Get current business details including currency
+      const bizDetails = await apiClient.getBusiness(Number(business.id));
+      
+      setEditBusiness(bizDetails);
+      setEditBizName(bizDetails.name || '');
+      setEditCurrencyCode(bizDetails.currency_code || 'USD');
+      setEditCurrencySymbol(bizDetails.currency_symbol || '$');
+      setOpenEditBiz(true);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load business details');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleSaveBusinessEdit = async () => {
+    try {
+      setBusy(true);
+      setError('');
+      
+      if (!editBusiness) return;
+      if (!editBizName.trim()) {
+        setError('Business name is required');
+        setBusy(false);
+        return;
+      }
+      if (!editCurrencyCode.trim() || !editCurrencySymbol.trim()) {
+        setError('Currency code and symbol are required');
+        setBusy(false);
+        return;
+      }
+
+      // Update business currency
+      await apiClient.updateBusinessCurrency(
+        Number(editBusiness.id), 
+        editCurrencyCode.trim().toUpperCase(), 
+        editCurrencySymbol.trim()
+      );
+      
+      setOpenEditBiz(false);
+      onRefresh(); // Reload the business list
+    } catch (e: any) {
+      setError(e?.message || 'Failed to update business');
     } finally {
       setBusy(false);
     }
@@ -632,6 +694,18 @@ export default function UsersPage() {
                                 size="sm"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  openEditBusiness(g.business);
+                                }}
+                                title="Edit business settings"
+                              >
+                                <Pencil className="h-4 w-4 mr-1" />
+                                Edit Business
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   openCredsForBusiness(String(g.business.id), g.business.name);
                                 }}
                                 title="Edit Back Market API credentials"
@@ -794,6 +868,80 @@ export default function UsersPage() {
                 <Button onClick={handleSaveCreds} disabled={busy || (!credsKey.trim() && !credsExists)}>
                   <Pencil className="h-4 w-4 mr-2" />
                   Save
+                </Button>
+              </div>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Business Dialog */}
+        <Dialog open={openEditBiz} onOpenChange={setOpenEditBiz}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Edit Business Settings</DialogTitle>
+              <DialogDescription>
+                {editBusiness ? `Business: ${editBusiness.name}` : 'Update business information and currency settings'}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="editBizName">Business Name</Label>
+                <Input
+                  id="editBizName"
+                  value={editBizName}
+                  onChange={(e) => setEditBizName(e.target.value)}
+                  placeholder="Enter business name"
+                />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="editCurrencyCode">Currency</Label>
+                  <Select value={editCurrencyCode} onValueChange={setEditCurrencyCode}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select currency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {COMMON_CURRENCIES.map((currency) => (
+                        <SelectItem key={currency.code} value={currency.code}>
+                          {currency.code} ({currency.symbol})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="grid gap-2">
+                  <Label htmlFor="editCurrencySymbol">Currency Symbol</Label>
+                  <Input
+                    id="editCurrencySymbol"
+                    value={editCurrencySymbol}
+                    onChange={(e) => setEditCurrencySymbol(e.target.value)}
+                    placeholder="e.g., $, €, £"
+                    maxLength={5}
+                  />
+                </div>
+              </div>
+              
+              {editCurrencyCode && editCurrencySymbol && (
+                <div className="p-3 bg-blue-50 rounded">
+                  <div className="text-sm text-blue-700">
+                    <strong>Preview:</strong> {editCurrencySymbol}1,234.56 ({editCurrencyCode})
+                  </div>
+                </div>
+              )}
+
+              {error && <div className="text-red-600 text-sm">{error}</div>}
+            </div>
+            <DialogFooter>
+              <div className="flex gap-2">
+                <DialogClose asChild>
+                  <Button variant="outline" disabled={busy}>
+                    Cancel
+                  </Button>
+                </DialogClose>
+                <Button onClick={handleSaveBusinessEdit} disabled={busy}>
+                  {busy ? 'Saving...' : 'Save Changes'}
                 </Button>
               </div>
             </DialogFooter>
