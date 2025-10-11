@@ -1,7 +1,7 @@
 // src/api.ts
 // Use relative path for production, localhost for development
 const API_BASE_URL = typeof window !== 'undefined' 
-  ? '/api'  // Use relative path in browser
+  ? ''  // Use empty base since backend routes already include /api
   : "http://localhost:5000";  // Fallback for SSR
 
 class ApiClient {
