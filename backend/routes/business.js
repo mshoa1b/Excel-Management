@@ -4,7 +4,7 @@ const router = express.Router();
 const authenticateToken = require("../middleware/auth");
 const pool = require("../lib/db");
 const { ROLE } = require("../lib/roles");
-const { createBusiness, getBusinesses } = require("../models/Business");
+const { createBusiness, getBusinesses, getBusinessById, updateBusinessCurrency } = require("../models/Business");
 
 // GET /api/businesses
 router.get("/", authenticateToken, async (req, res) => {
@@ -77,6 +77,61 @@ router.get("/:businessId/users", authenticateToken, async (req, res) => {
   } catch (err) {
     console.error("GET /api/businesses/:businessId/users error:", err);
     return res.status(500).json({ message: "Failed to fetch users" });
+  }
+});
+
+// GET /api/businesses/:businessId - Get specific business details including currency
+router.get("/:businessId", authenticateToken, async (req, res) => {
+  try {
+    const businessId = Number(req.params.businessId);
+    if (!Number.isFinite(businessId) || businessId <= 0) {
+      return res.status(400).json({ message: "Invalid businessId" });
+    }
+
+    // Superadmin can view any business, Business Admin can only view their own
+    if (req.user.role_id !== ROLE.SUPER_ADMIN && req.user.business_id !== businessId) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const business = await getBusinessById(businessId);
+    if (!business) {
+      return res.status(404).json({ message: "Business not found" });
+    }
+
+    return res.json(business);
+  } catch (err) {
+    console.error("GET /api/businesses/:businessId error:", err);
+    return res.status(500).json({ message: "Failed to fetch business" });
+  }
+});
+
+// PATCH /api/businesses/:businessId/currency - Update business currency
+router.patch("/:businessId/currency", authenticateToken, async (req, res) => {
+  try {
+    const businessId = Number(req.params.businessId);
+    if (!Number.isFinite(businessId) || businessId <= 0) {
+      return res.status(400).json({ message: "Invalid businessId" });
+    }
+
+    // Only Superadmin or Business Admin of this business can update currency
+    if (req.user.role_id !== ROLE.SUPER_ADMIN && req.user.business_id !== businessId) {
+      return res.status(403).json({ message: "Unauthorized" });
+    }
+
+    const { currency_code, currency_symbol } = req.body;
+    if (!currency_code || !currency_symbol) {
+      return res.status(400).json({ message: "currency_code and currency_symbol are required" });
+    }
+
+    const updatedBusiness = await updateBusinessCurrency(businessId, { currency_code, currency_symbol });
+    if (!updatedBusiness) {
+      return res.status(404).json({ message: "Business not found" });
+    }
+
+    return res.json(updatedBusiness);
+  } catch (err) {
+    console.error("PATCH /api/businesses/:businessId/currency error:", err);
+    return res.status(500).json({ message: "Failed to update business currency" });
   }
 });
 

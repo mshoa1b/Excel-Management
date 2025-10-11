@@ -6,6 +6,7 @@ import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
 import { useAuth } from '@/hooks/useAuth';
+import { useCurrency } from '@/hooks/useCurrency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiClient } from '@/lib/api';
@@ -23,6 +24,7 @@ export default function StatsPage() {
   const params = useParams();
   const businessId = params.businessId as string;
   const { user } = useAuth();
+  const { currency, formatCurrency, isLoading: currencyLoading } = useCurrency(businessId);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedRange, setSelectedRange] = useState('1m');
@@ -71,10 +73,6 @@ export default function StatsPage() {
     <ProtectedRoute businessId={businessId}>
       <DashboardLayout>
         <div className="space-y-8">
-          {/* Debug Info */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-xs">
-            <strong>Debug Info:</strong> Route businessId: {businessId}, User businessId: {user?.business_id}, Role: {user?.role?.name}
-          </div>
           
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
@@ -112,13 +110,13 @@ export default function StatsPage() {
                 />
                 <StatsCard
                   title="Total Refund Amount"
-                  value={`$${stats.totalRefundAmount.toFixed(2)}`}
+                  value={formatCurrency(stats.totalRefundAmount)}
                   description={getRangeLabel(selectedRange)}
                   icon={DollarSign}
                 />
                 <StatsCard
                   title="Average Refund"
-                  value={`$${stats.averageRefundAmount.toFixed(2)}`}
+                  value={formatCurrency(stats.averageRefundAmount)}
                   description="Per order"
                   icon={TrendingUp}
                 />
@@ -201,12 +199,12 @@ export default function StatsPage() {
                     <div className="space-y-4">
                       <div className="flex justify-between items-center py-2 border-b border-slate-100">
                         <span className="text-slate-600">Total Refund Amount</span>
-                        <span className="font-bold text-lg">${stats.totalRefundAmount.toFixed(2)}</span>
+                        <span className="font-bold text-lg">{formatCurrency(stats.totalRefundAmount)}</span>
                       </div>
                       
                       <div className="flex justify-between items-center py-2 border-b border-slate-100">
                         <span className="text-slate-600">Average per Order</span>
-                        <span className="font-bold text-lg">${stats.averageRefundAmount.toFixed(2)}</span>
+                        <span className="font-bold text-lg">{formatCurrency(stats.averageRefundAmount)}</span>
                       </div>
                       
                       <div className="flex justify-between items-center py-2">

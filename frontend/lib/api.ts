@@ -92,6 +92,17 @@ class ApiClient {
     return this.request(`/businesses/${businessId}/users`);
   }
 
+  getBusiness(businessId: number) {
+    return this.request(`/businesses/${businessId}`);
+  }
+
+  updateBusinessCurrency(businessId: number, currency_code: string, currency_symbol: string) {
+    return this.request(`/businesses/${businessId}/currency`, {
+      method: "PATCH",
+      body: JSON.stringify({ currency_code, currency_symbol }),
+    });
+  }
+
   // -------- Users --------
   getUsers() {
     return this.request("/users");
