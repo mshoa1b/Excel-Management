@@ -10,7 +10,7 @@ const nextConfig = {
     unoptimized: true 
   },
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api'),
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || (process.env.NODE_ENV === 'production' ? 'https://excel-management-backend.vercel.app/api' : 'http://localhost:5000/api'),
   },
   async rewrites() {
     return process.env.NODE_ENV === 'production' 
