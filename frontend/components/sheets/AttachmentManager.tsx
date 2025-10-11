@@ -2,7 +2,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Progress } from '@/components/ui/progress';
+// import { Progress } from '@/components/ui/progress';
 import { Paperclip, Upload, X, Eye, Download, FileImage, AlertCircle } from 'lucide-react';
 import { apiClient } from '@/lib/api';
 
@@ -211,7 +211,12 @@ export function AttachmentManager({ sheetId, onAttachmentChange }: AttachmentMan
                   <span className="text-sm font-medium">Uploading...</span>
                   <span className="text-sm text-gray-500">{uploadProgress}%</span>
                 </div>
-                <Progress value={uploadProgress} />
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
               </div>
             )}
           </div>
