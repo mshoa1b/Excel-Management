@@ -17,8 +17,13 @@ const createSheet = async (sheet) => {
   } = sheet;
 
   const platform = /^\d{8}$/.test(order_no) ? 'Back Market' : 'Amazon';
-  const return_within_30_days = (date_received && order_date)
-    ? Math.floor((new Date(date_received) - new Date(order_date)) / (1000*60*60*24)) <= 30 ? 'Yes' : 'No'
+  // Convert empty strings to null for date fields to prevent PostgreSQL errors
+  const safeDateReceived = date_received === '' ? null : date_received;
+  const safeOrderDate = order_date === '' ? null : order_date;
+  const safeRefundDate = refund_date === '' ? null : refund_date;
+
+  const return_within_30_days = (safeDateReceived && safeOrderDate)
+    ? Math.floor((new Date(safeDateReceived) - new Date(safeOrderDate)) / (1000*60*60*24)) <= 30 ? 'Yes' : 'No'
     : 'No';
 
   const result = await pool.query(
@@ -31,10 +36,10 @@ const createSheet = async (sheet) => {
       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
      RETURNING *`,
     [
-      business_id, date_received, order_no, order_date, customer_name, imei, sku,
+      business_id, safeDateReceived, order_no, safeOrderDate, customer_name, imei, sku,
       customer_comment, multiple_return, apple_google_id, return_type, locked || 'No', oow_case || 'No',
-      replacement_available, done_by, blocked_by, cs_comment, resolution, refund_amount, refund_date,
-      return_tracking_no, platform, return_within_30_days, issue, out_of_warranty,
+      replacement_available, done_by, blocked_by, cs_comment, resolution, refund_amount, safeRefundDate,
+      return_tracking_no, platform, return_within_30_days, issue, out_of_warranty || 'Choose',
       additional_notes, status, manager_notes
     ]
   );
@@ -57,6 +62,11 @@ const updateSheet = async (sheet) => {
     ? Math.floor((new Date(date_received) - new Date(order_date)) / (1000*60*60*24)) <= 30 ? 'Yes' : 'No'
     : 'No';
 
+  // Convert empty strings to null for date fields to prevent PostgreSQL errors
+  const safeDateReceived = date_received === '' ? null : date_received;
+  const safeOrderDate = order_date === '' ? null : order_date;
+  const safeRefundDate = refund_date === '' ? null : refund_date;
+
   const result = await pool.query(
     `UPDATE sheets SET
       date_received=$1, order_no=$2, order_date=$3, customer_name=$4, imei=$5, sku=$6, customer_comment=$7,
@@ -67,10 +77,10 @@ const updateSheet = async (sheet) => {
     WHERE id=$28 AND business_id=$29
     RETURNING *`,
     [
-      date_received, order_no, order_date, customer_name, imei, sku, customer_comment,
+      safeDateReceived, order_no, safeOrderDate, customer_name, imei, sku, customer_comment,
       multiple_return, apple_google_id, return_type, locked || 'No', oow_case || 'No', replacement_available,
-      done_by, blocked_by, cs_comment, resolution, refund_amount, refund_date,
-      return_tracking_no, platform, return_within_30_days, issue, out_of_warranty,
+      done_by, blocked_by, cs_comment, resolution, refund_amount, safeRefundDate,
+      return_tracking_no, platform, return_within_30_days, issue, out_of_warranty || 'Choose',
       additional_notes, status, manager_notes, id, business_id
     ]
   );

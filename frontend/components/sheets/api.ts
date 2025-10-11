@@ -43,6 +43,12 @@ export const updateSheet = (businessId: string, payload: Partial<SheetRecord> & 
 export const deleteSheet = (businessId: string, id: number) =>
   request(`/api/sheets/${businessId}`, { method: 'DELETE', body: JSON.stringify({ id }) });
 
+export const searchSheets = (businessId: string, searchTerm: string): Promise<SheetRecord[]> =>
+  request(`/api/sheets/${businessId}/search?q=${encodeURIComponent(searchTerm)}`);
+
+export const getSheetsByDateRange = (businessId: string, dateFrom: string, dateTo: string): Promise<SheetRecord[]> =>
+  request(`/api/sheets/${businessId}/daterange?from=${dateFrom}&to=${dateTo}`);
+
 // -------------------- BackMarket API via Backend --------------------
 export async function fetchBMOrder(orderNo: string) {
   if (!orderNo || orderNo.length !== 8) throw new Error('Invalid BackMarket order number');

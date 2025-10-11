@@ -45,9 +45,39 @@ router.get("/:orderNumber", authenticateToken, async (req, res) => {
       return res.status(404).json({ message: "No Back Market credentials configured for this business" });
     }
 
-    const api_key = open(c.rows[0].api_key_enc);
-    const api_secret = open(c.rows[0].api_secret_enc);
+    const stored_credentials = open(c.rows[0].api_key_enc);
+    
+    // Parse stored credentials - could be "key:secret" or base64 encoded "key:secret"
+    let api_key, api_secret;
+    
+    if (stored_credentials) {
+      // Try to decode as base64 first (in case it's double-encoded)
+      let credentials_to_parse = stored_credentials;
+      try {
+        // Check if it looks like base64
+        if (/^[A-Za-z0-9+/=]+$/.test(stored_credentials)) {
+          const decoded = Buffer.from(stored_credentials, 'base64').toString('utf8');
+          if (decoded.includes(':')) {
+            credentials_to_parse = decoded;
+          }
+        }
+      } catch (e) {
+        // Not base64, use as-is
+      }
+      
+      // Now parse the credentials
+      if (credentials_to_parse.includes(':')) {
+        const parts = credentials_to_parse.split(':');
+        api_key = parts[0];
+        api_secret = parts[1];
+      } else {
+        api_key = credentials_to_parse;
+        api_secret = c.rows[0].api_secret_enc ? open(c.rows[0].api_secret_enc) : null;
+      }
+    }
+    
     const authHeader = buildAuthHeader(api_key, api_secret);
+    
     if (!authHeader) {
       return res.status(500).json({ message: "Back Market credentials invalid" });
     }
@@ -77,24 +107,24 @@ router.get("/:orderNumber", authenticateToken, async (req, res) => {
     const sheetData = {
       customer_name: `${orderData?.shipping_address?.first_name || ""} ${orderData?.shipping_address?.last_name || ""}`.trim(),
       imei: firstLine?.imei || "",
-      sku: firstLine?.product || firstLine?.listing || "",
+      sku: firstLine?.listing || "",
       order_date: created ? created.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-      date_received: shipped ? shipped.toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-      return_tracking_no: orderData?.tracking_number || "",
-      refund_amount: Number(orderData?.price ?? 0),
+      date_received: new Date().toISOString().slice(0, 10),
+      return_tracking_no: "",
+      refund_amount: 0,
       platform: "Back Market",
       return_within_30_days: within30 ? "Yes" : "No",
 
       multiple_return: "Choose",
       apple_google_id: "Choose",
-      return_type: "Refund",
-      replacement_available: "Yes",
-      done_by: "",
-      blocked_by: "PIN Required",
+      return_type: "Choose",
+      replacement_available: "Choose",
+      done_by: "Choose",
+      blocked_by: "",
       cs_comment: "",
-      resolution: "Back in stock",
+      resolution: "Choose",
       issue: "Choose",
-      out_of_warranty: "No",
+      out_of_warranty: "Choose",
       additional_notes: "",
       status: "Pending",
       manager_notes: ""

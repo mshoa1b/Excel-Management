@@ -20,53 +20,122 @@ function assertBusinessScope(req, res, next) {
   return next();
 }
 
-// GET /api/sheets/:businessId
+// GET /api/sheets/:businessId - Default filtered load
 router.get("/:businessId", authenticateToken, assertBusinessScope, async (req, res) => {
   try {
     const businessId = Number(req.params.businessId);
+    
+    // Get first day of current month
+    const now = new Date();
+    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const firstOfMonthStr = firstOfMonth.toISOString().split('T')[0];
 
     const { rows } = await pool.query(
       `
       SELECT
-        id,
-        business_id,
-        date_received,
-        order_date,
-        order_no,
-        customer_name,
-        imei,
-        sku,
-        customer_comment,
-        multiple_return,
-        apple_google_id,
-        return_type,
-        locked,
-        oow_case,
-        replacement_available,
-        done_by,
-        blocked_by,
-        cs_comment,
-        resolution,
-        COALESCE(refund_amount,0)::float AS refund_amount,
-        refund_date,
-        return_tracking_no,
-        platform,
-        return_within_30_days,
-        issue,
-        out_of_warranty,
-        additional_notes,
-        status,
-        manager_notes
+        id, business_id, date_received, order_date, order_no, customer_name, imei, sku,
+        customer_comment, multiple_return, apple_google_id, return_type, locked, oow_case,
+        replacement_available, done_by, blocked_by, cs_comment, resolution,
+        COALESCE(refund_amount,0)::float AS refund_amount, refund_date, return_tracking_no,
+        platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes
       FROM sheets
       WHERE business_id = $1
-      ORDER BY date_received DESC, id DESC
+        AND (
+          status != 'Resolved'
+          OR (status = 'Resolved' AND date_received >= $2)
+        )
+      ORDER BY 
+        CASE WHEN blocked_by IS NOT NULL AND blocked_by != '' THEN 0 ELSE 1 END,
+        CASE WHEN status != 'Resolved' THEN 0 ELSE 1 END,
+        CASE WHEN status = 'Resolved' THEN 1 ELSE 0 END,
+        date_received DESC,
+        id DESC
       `,
-      [businessId]
+      [businessId, firstOfMonthStr]
     );
     res.json(rows);
   } catch (err) {
     console.error("GET /api/sheets/:businessId error:", err);
     res.status(500).json({ message: "Failed to fetch sheets" });
+  }
+});
+
+// GET /api/sheets/:businessId/search?q=searchTerm - Search in all records
+router.get("/:businessId/search", authenticateToken, assertBusinessScope, async (req, res) => {
+  try {
+    const businessId = Number(req.params.businessId);
+    const searchTerm = req.query.q?.toString().trim();
+    
+    if (!searchTerm) {
+      return res.json([]);
+    }
+
+    const { rows } = await pool.query(
+      `
+      SELECT
+        id, business_id, date_received, order_date, order_no, customer_name, imei, sku,
+        customer_comment, multiple_return, apple_google_id, return_type, locked, oow_case,
+        replacement_available, done_by, blocked_by, cs_comment, resolution,
+        COALESCE(refund_amount,0)::float AS refund_amount, refund_date, return_tracking_no,
+        platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes
+      FROM sheets
+      WHERE business_id = $1
+        AND (
+          LOWER(order_no) LIKE LOWER($2)
+          OR LOWER(customer_name) LIKE LOWER($2)
+        )
+      ORDER BY 
+        CASE WHEN blocked_by IS NOT NULL AND blocked_by != '' THEN 0 ELSE 1 END,
+        CASE WHEN status != 'Resolved' THEN 0 ELSE 1 END,
+        CASE WHEN status = 'Resolved' THEN 1 ELSE 0 END,
+        date_received DESC,
+        id DESC
+      `,
+      [businessId, `%${searchTerm}%`]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("GET /api/sheets/:businessId/search error:", err);
+    res.status(500).json({ message: "Failed to search sheets" });
+  }
+});
+
+// GET /api/sheets/:businessId/daterange?from=date&to=date - Filter by date range
+router.get("/:businessId/daterange", authenticateToken, assertBusinessScope, async (req, res) => {
+  try {
+    const businessId = Number(req.params.businessId);
+    const dateFrom = req.query.from?.toString();
+    const dateTo = req.query.to?.toString();
+    
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({ message: "Both from and to dates are required" });
+    }
+
+    const { rows } = await pool.query(
+      `
+      SELECT
+        id, business_id, date_received, order_date, order_no, customer_name, imei, sku,
+        customer_comment, multiple_return, apple_google_id, return_type, locked, oow_case,
+        replacement_available, done_by, blocked_by, cs_comment, resolution,
+        COALESCE(refund_amount,0)::float AS refund_amount, refund_date, return_tracking_no,
+        platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes
+      FROM sheets
+      WHERE business_id = $1
+        AND date_received >= $2
+        AND date_received <= $3
+      ORDER BY 
+        CASE WHEN blocked_by IS NOT NULL AND blocked_by != '' THEN 0 ELSE 1 END,
+        CASE WHEN status != 'Resolved' THEN 0 ELSE 1 END,
+        CASE WHEN status = 'Resolved' THEN 1 ELSE 0 END,
+        date_received DESC,
+        id DESC
+      `,
+      [businessId, dateFrom, dateTo]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error("GET /api/sheets/:businessId/daterange error:", err);
+    res.status(500).json({ message: "Failed to fetch sheets by date range" });
   }
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ModuleRegistry,
   AllCommunityModule,
@@ -19,8 +19,11 @@ import { AgGridReact } from 'ag-grid-react';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 import { Button } from '@/components/ui/button';
-import { Plus, Trash2, RotateCcw } from 'lucide-react';
-import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder } from './api';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Plus, Trash2, RotateCcw, Search, Calendar } from 'lucide-react';
+import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
 import { format } from 'date-fns';
 
@@ -50,7 +53,7 @@ export interface SheetRecord {
   platform: string;
   return_within_30_days: boolean;
   issue: string;
-  out_of_warranty: boolean;
+  out_of_warranty: string;
   additional_notes: string;
   status: string;
   manager_notes: string;
@@ -58,19 +61,53 @@ export interface SheetRecord {
 
 const staffOptions = ['Alice', 'Bob', 'Charlie'];
 const blockedByOptions = [
-  'PIN Required','Code Required','Apple ID Required','Google ID Required',
-  'Awaiting Part','Awaiting Replacement','Awaiting Customer','Awaiting BM','Awaiting G&I','Awaiting Softezm'
+  'Choose','','PIN Required','Code Required','Apple ID Required','Google ID Required',
+  'Awaiting Part','Awaiting Replacement','Awaiting Customer','Awaiting BM','Awaiting G&I','Awaiting Techezm'
 ];
-const lockedOptions = ['No','Google ID','Apple ID','PIN'];
-const oowOptions = ['No','Damaged','Wrong Device'];
+const lockedOptions = ['Choose','No','Google ID','Apple ID','PIN'];
+const oowOptions = ['Choose','No','Damaged','Wrong Device'];
 
 // Columns that should be multiline, fixed width
 const MULTILINE_COLS = ['customer_comment', 'additional_notes', 'cs_comment', 'manager_notes'];
 
 // Helpers
 const toYMD = (v: any): string => {
-  if (!v) return '';
-  const d = typeof v === 'string' ? new Date(v) : v instanceof Date ? v : new Date(v);
+  if (!v || v === '') return '';
+  
+  // Handle string dates
+  if (typeof v === 'string') {
+    // If already in YYYY-MM-DD format, return as-is
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+    
+    // Handle dd/MM/yyyy format (European style - our display format)
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v)) {
+      const [day, month, year] = v.split('/');
+      const parsedDay = parseInt(day, 10);
+      const parsedMonth = parseInt(month, 10);
+      const parsedYear = parseInt(year, 10);
+      
+      // Validate ranges
+      if (parsedDay >= 1 && parsedDay <= 31 && parsedMonth >= 1 && parsedMonth <= 12) {
+        const date = new Date(parsedYear, parsedMonth - 1, parsedDay);
+        if (!isNaN(date.getTime())) {
+          return format(date, 'yyyy-MM-dd');
+        }
+      }
+    }
+    
+    const d = new Date(v);
+    if (isNaN(d.getTime())) return '';
+    return format(d, 'yyyy-MM-dd');
+  }
+  
+  // Handle Date objects
+  if (v instanceof Date) {
+    if (isNaN(v.getTime())) return '';
+    return format(v, 'yyyy-MM-dd');
+  }
+  
+  // Try to parse other formats
+  const d = new Date(v);
   if (isNaN(d.getTime())) return '';
   return format(d, 'yyyy-MM-dd');
 };
@@ -107,10 +144,10 @@ const normalizeForSave = (r: SheetRecord): SheetRecord => ({
   refund_amount: Number(r.refund_amount ?? 0),
   platform: computePlatform(r.order_no ?? ''),
   return_within_30_days: !!r.return_within_30_days,
-  out_of_warranty: !!r.out_of_warranty,
-  date_received: toYMD(r.date_received),
-  order_date: toYMD(r.order_date),
-  refund_date: r.refund_date ? toYMD(r.refund_date) : undefined,
+  out_of_warranty: r.out_of_warranty || 'Choose',
+  date_received: toYMD(r.date_received) || '',
+  order_date: toYMD(r.order_date) || '',
+  refund_date: r.refund_date ? toYMD(r.refund_date) || '' : '',
 });
 
 /** ========= Row color helpers ========= **/
@@ -139,7 +176,7 @@ const colorForRow = (r?: SheetRecord): string => {
       const b = (r.blocked_by || '').trim();
       if (eq(b, 'Awaiting Customer') || eq(b, 'Awaiting BM')) return '#F59E0B';
       if (eq(b, 'Awaiting G&I')) return '#1D4ED8';
-      if (eq(b, 'Awaiting Softezm')) return '#F97316';
+      if (eq(b, 'Awaiting Techezm')) return '#F97316';
       if (eq(b, 'Awaiting Replacement')) return '#DB2777';
       return '#6B7280';
     }
@@ -169,9 +206,74 @@ const colorForRow = (r?: SheetRecord): string => {
 export default function SheetsGrid({ businessId }: { businessId: string }) {
   const apiRef = useRef<GridApi<SheetRecord> | null>(null);
   const [rowData, setRowData] = useState<SheetRecord[]>([]);
+  const [filteredData, setFilteredData] = useState<SheetRecord[]>([]);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [dateFrom, setDateFrom] = useState<string>('');
+  const [dateTo, setDateTo] = useState<string>('');
+  const [isDateFiltered, setIsDateFiltered] = useState<boolean>(false);
+  const [platformFilter, setPlatformFilter] = useState<string>('All');
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState<boolean>(false);
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState<boolean>(false);
+  const [selectedRowsForDeletion, setSelectedRowsForDeletion] = useState<number[]>([]);
+  const [singleRowIdForDeletion, setSingleRowIdForDeletion] = useState<number | null>(null);
   const [totals, setTotals] = useState<{ amazon: number; backmarket: number; total: number }>({
     amazon: 0, backmarket: 0, total: 0
   });
+
+  // Smart search and platform filtering
+  useEffect(() => {
+    const performFiltering = async () => {
+      let dataToFilter = rowData;
+
+      // Apply search filter first
+      if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase();
+        const localFiltered = rowData.filter(row => {
+          const orderNo = (row.order_no || '').toLowerCase();
+          const customerName = (row.customer_name || '').toLowerCase();
+          return orderNo.includes(searchLower) || customerName.includes(searchLower);
+        });
+
+        // If found results in local data, use them
+        if (localFiltered.length > 0) {
+          dataToFilter = localFiltered;
+        } else {
+          // If no local results, search the full database
+          try {
+            const searchResults = await searchSheets(businessId, searchTerm);
+            const formatted = searchResults.map((row: any) => ({
+              ...row,
+              id: Number(row.id),
+              business_id: Number(row.business_id),
+              refund_amount: Number(row.refund_amount ?? 0),
+              date_received: row.date_received ? toYMD(row.date_received) : '',
+              order_date: row.order_date ? toYMD(row.order_date) : '',
+              refund_date: row.refund_date ? toYMD(row.refund_date) : '',
+              return_within_30_days: !!row.return_within_30_days,
+              out_of_warranty: row.out_of_warranty || 'Choose',
+            }));
+            dataToFilter = formatted;
+          } catch (error) {
+            dataToFilter = localFiltered; // Fall back to local results (empty)
+          }
+        }
+      }
+
+      // Apply platform filter
+      if (platformFilter !== 'All') {
+        dataToFilter = dataToFilter.filter(row => {
+          const platform = computePlatform(row.order_no || '');
+          return platform === platformFilter;
+        });
+      }
+
+      setFilteredData(dataToFilter);
+    };
+
+    // Debounce the search to avoid too many API calls
+    const timeoutId = setTimeout(performFiltering, 300);
+    return () => clearTimeout(timeoutId);
+  }, [rowData, searchTerm, platformFilter, businessId]);
 
   // Prevent hover from overriding row colors
   useEffect(() => {
@@ -244,7 +346,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           order_date: row.order_date ? toYMD(row.order_date) : '',
           refund_date: row.refund_date ? toYMD(row.refund_date) : '',
           return_within_30_days: !!row.return_within_30_days,
-          out_of_warranty: !!row.out_of_warranty,
+          out_of_warranty: row.out_of_warranty || 'Choose',
         }))
       : [];
     setRowData(formatted);
@@ -258,11 +360,57 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Date range filtering
+  const handleDateRangeFilter = useCallback(async () => {
+    if (!dateFrom || !dateTo) return;
+
+    try {
+      const dateResults = await getSheetsByDateRange(businessId, dateFrom, dateTo);
+      const formatted: SheetRecord[] = dateResults.map((row: any) => ({
+        ...row,
+        id: Number(row.id),
+        business_id: Number(row.business_id),
+        refund_amount: Number(row.refund_amount ?? 0),
+        date_received: row.date_received ? toYMD(row.date_received) : '',
+        order_date: row.order_date ? toYMD(row.order_date) : '',
+        refund_date: row.refund_date ? toYMD(row.refund_date) : '',
+        return_within_30_days: !!row.return_within_30_days,
+        out_of_warranty: row.out_of_warranty || 'Choose',
+      }));
+      
+      setRowData(formatted);
+      setIsDateFiltered(true);
+      recomputeTodayTotals(formatted);
+
+      setTimeout(() => {
+        autoSizeNonMultiline();
+        reflowAutoHeight();
+      }, 0);
+    } catch (error) {
+      // Silently handle date range filter errors
+    }
+  }, [businessId, dateFrom, dateTo, autoSizeNonMultiline, reflowAutoHeight, recomputeTodayTotals]);
+
+  // Clear date filter and return to default loading
+  const clearDateFilter = useCallback(() => {
+    setDateFrom('');
+    setDateTo('');
+    setIsDateFiltered(false);
+    refresh(); // This will load the default filtered data
+  }, [refresh]);
+
+  // Trigger date filter when both dates are selected
+  useEffect(() => {
+    if (dateFrom && dateTo) {
+      handleDateRangeFilter();
+    }
+  }, [dateFrom, dateTo, handleDateRangeFilter]);
+
   // Add/Delete
   const addRow = async () => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const base: Partial<SheetRecord> = {
-      blocked_by: 'PIN Required',
+      blocked_by: '',
       date_received: today,
       order_date: today,
       order_no: '',
@@ -272,20 +420,20 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       customer_comment: '',
       multiple_return: 'Choose',
       apple_google_id: 'Choose',
-      return_type: 'Refund',
-      locked: 'No',
-      oow_case: 'No',
-      replacement_available: 'Yes',
-      done_by: staffOptions[0],
+      return_type: 'Choose',
+      locked: 'Choose',
+      oow_case: 'Choose',
+      replacement_available: 'Choose',
+      done_by: 'Choose',
       cs_comment: '',
-      resolution: 'Back in stock',
+      resolution: 'Choose',
       refund_amount: 0,
-      refund_date: today,
+      refund_date: undefined,
       return_tracking_no: '',
       platform: '',
       return_within_30_days: false,
       issue: 'Choose',
-      out_of_warranty: false,
+      out_of_warranty: 'Choose',
       additional_notes: '',
       status: 'Pending',
       manager_notes: '',
@@ -305,12 +453,36 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     });
   };
 
-  const removeSelected = async () => {
+  const removeSelected = () => {
     const rows = apiRef.current?.getSelectedRows() || [];
     if (!rows.length) return;
-    if (!confirm(`Delete ${rows.length} row(s)?`)) return;
-    for (const r of rows) if (r.id) await deleteSheet(businessId, r.id);
+    
+    const rowIds = rows.map(r => r.id).filter(Boolean) as number[];
+    setSelectedRowsForDeletion(rowIds);
+    setBulkDeleteConfirmOpen(true);
+  };
+
+  const confirmBulkDelete = async () => {
+    for (const id of selectedRowsForDeletion) {
+      await deleteSheet(businessId, id);
+    }
+    setBulkDeleteConfirmOpen(false);
+    setSelectedRowsForDeletion([]);
     await refresh();
+  };
+
+  const handleSingleRowDelete = (rowId: number) => {
+    setSingleRowIdForDeletion(rowId);
+    setDeleteConfirmOpen(true);
+  };
+
+  const confirmSingleDelete = async () => {
+    if (singleRowIdForDeletion) {
+      await deleteSheet(businessId, singleRowIdForDeletion);
+      setDeleteConfirmOpen(false);
+      setSingleRowIdForDeletion(null);
+      await refresh();
+    }
   };
 
   // BM auto-fill
@@ -350,6 +522,20 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     const r = event.data;
     if (!r?.id) return;
 
+    // Prevent saving if the change would result in data loss
+    const changedField = event.colDef.field as string | undefined;
+    if (changedField && ['date_received', 'order_date', 'refund_date'].includes(changedField)) {
+      // If the new value is invalid and would clear existing data, don't save
+      if (event.newValue === '' && event.oldValue && event.oldValue !== '') {
+        // Restore the old value
+        if (event.node && event.node.data) {
+          (event.node.data as any)[changedField] = event.oldValue;
+          apiRef.current?.redrawRows?.({ rowNodes: [event.node] });
+        }
+        return;
+      }
+    }
+
     const payload = normalizeForSave(r);
 
     // Trigger BM fetch when order_no becomes 8 chars
@@ -359,9 +545,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       return;
     }
 
-    await updateSheet(String(payload.business_id), payload).catch(err =>
-      console.error('Save failed:', err?.message)
-    );
+    await updateSheet(String(payload.business_id), payload).catch(() => {
+      // Silently handle save errors
+    });
 
     // Autosize changed column if not multiline
     const field = event.colDef.field as string | undefined;
@@ -382,9 +568,81 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     apiRef.current?.redrawRows?.({ rowNodes: [event.node] });
   };
 
+  // Custom Date Cell Editor Component
+  const DateCellEditor = React.forwardRef((props: any, ref: any) => {
+    const [value, setValue] = React.useState('');
+    const inputRef = React.useRef<HTMLInputElement>(null);
+
+    React.useImperativeHandle(ref, () => ({
+      getValue: () => {
+        // Convert display format back to YYYY-MM-DD for storage
+        return toYMD(value) || props.value || '';
+      },
+      isCancelBeforeStart: () => false,
+      isCancelAfterEnd: () => false,
+    }));
+
+    React.useEffect(() => {
+      // Initialize with formatted display value
+      const initialValue = props.value ? format(new Date(props.value), 'dd/MM/yyyy') : '';
+      setValue(initialValue);
+      
+      // Focus and select the input
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
+    }, [props.value]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let newValue = e.target.value;
+      
+      // Auto-format as user types (add slashes)
+      newValue = newValue.replace(/\D/g, ''); // Remove non-digits
+      if (newValue.length >= 2) {
+        newValue = newValue.slice(0, 2) + '/' + newValue.slice(2);
+      }
+      if (newValue.length >= 5) {
+        newValue = newValue.slice(0, 5) + '/' + newValue.slice(5, 9);
+      }
+      
+      setValue(newValue);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        props.stopEditing();
+      } else if (e.key === 'Escape') {
+        setValue(props.value ? format(new Date(props.value), 'dd/MM/yyyy') : '');
+        props.stopEditing();
+      }
+    };
+
+    return (
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={handleChange}
+        onKeyDown={handleKeyDown}
+        placeholder="dd/MM/yyyy"
+        className="w-full h-full px-2 border-none outline-none bg-white"
+        style={{ height: '100%', border: 'none', outline: 'none' }}
+      />
+    );
+  });
+
+  DateCellEditor.displayName = 'DateCellEditor';
+
   // Formatters and parsers
   const dateFormatter = (p: any) => (p.value ? format(new Date(p.value), 'dd/MM/yyyy') : '');
-  const dateParser = (p: any) => toYMD(p.newValue);
+  const dateParser = (p: any) => {
+    // If newValue is null, undefined, or empty string, preserve the original value
+    if (p.newValue == null || p.newValue === '') {
+      return p.oldValue || '';
+    }
+    return toYMD(p.newValue);
+  };
   const numberParser = (p: any) => {
     const n = parseFloat(p.newValue);
     return isNaN(n) ? 0 : n;
@@ -394,10 +652,36 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   const colDefs: ColDef<SheetRecord>[] = useMemo(
     () => [
       { headerName: 'Blocked By', field: 'blocked_by', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: blockedByOptions }, pinned: 'left', minWidth: 120 },
-      { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.order_date, p.node?.rowIndex ?? 0), editable: false, minWidth: 120 },
+      { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, minWidth: 120 },
 
-      { headerName: 'Date Received', field: 'date_received', editable: true, cellEditor: 'agDateCellEditor', valueFormatter: dateFormatter, valueParser: dateParser, minWidth: 130 },
-      { headerName: 'Order Date', field: 'order_date', editable: true, cellEditor: 'agDateCellEditor', valueFormatter: dateFormatter, valueParser: dateParser, minWidth: 120 },
+      { headerName: 'Date Received', field: 'date_received', editable: true, 
+        cellEditor: DateCellEditor,
+        valueFormatter: dateFormatter, 
+        valueParser: dateParser,
+        suppressKeyboardEvent: (params: any) => {
+          // Prevent delete/backspace from clearing the cell when it has a value
+          if (params.event.key === 'Delete' || params.event.key === 'Backspace') {
+            if (params.node.data?.date_received) {
+              return true; // suppress the event
+            }
+          }
+          return false;
+        },
+        minWidth: 130 },
+      { headerName: 'Order Date', field: 'order_date', editable: true, 
+        cellEditor: DateCellEditor,
+        valueFormatter: dateFormatter, 
+        valueParser: dateParser,
+        suppressKeyboardEvent: (params: any) => {
+          // Prevent delete/backspace from clearing the cell when it has a value
+          if (params.event.key === 'Delete' || params.event.key === 'Backspace') {
+            if (params.node.data?.order_date) {
+              return true; // suppress the event
+            }
+          }
+          return false;
+        },
+        minWidth: 120 },
 
       { headerName: 'Order Number', field: 'order_no', editable: true, minWidth: 130 },
       { headerName: 'Customer Name', field: 'customer_name', editable: true, minWidth: 140 },
@@ -410,19 +694,32 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
       { headerName: 'Multiple Return', field: 'multiple_return', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','No','2nd Time','3rd Time'] }, minWidth: 130 },
       { headerName: 'Apple/Google ID', field: 'apple_google_id', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Yes','Yes-Issue raised','No'] }, minWidth: 150 },
-      { headerName: 'Return Type', field: 'return_type', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Refund','URGENT REPAIR','Replacement','Repair','Faulty','Other'] }, minWidth: 130 },
+      { headerName: 'Return Type', field: 'return_type', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Refund','URGENT REPAIR','Replacement','Repair','Faulty','Other'] }, minWidth: 130 },
 
       { headerName: 'Locked', field: 'locked', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: lockedOptions }, minWidth: 120 },
       { headerName: 'OOW Case', field: 'oow_case', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: oowOptions }, minWidth: 120 },
 
-      { headerName: 'Replacement Available', field: 'replacement_available', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Yes','No'] }, minWidth: 170 },
+      { headerName: 'Replacement Available', field: 'replacement_available', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Yes','No'] }, minWidth: 170 },
       { headerName: 'Done By', field: 'done_by', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: staffOptions }, minWidth: 110 },
 
-      { headerName: 'Resolution', field: 'resolution', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Back in stock','Sent repaired back to customer','Sent back to customer','Sent replacement','Sent back to supplier','BER'] }, minWidth: 160 },
+      { headerName: 'Resolution', field: 'resolution', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Back in stock','Sent repaired back to customer','Sent back to customer','Sent replacement','Sent back to supplier','BER'] }, minWidth: 160 },
 
       { headerName: 'Refund Amount', field: 'refund_amount', editable: true, valueFormatter: (p) => typeof p.value === 'number' ? `$${p.value.toFixed(2)}` : '$0.00', valueParser: numberParser, minWidth: 130 },
 
-      { headerName: 'Refund Date', field: 'refund_date', editable: true, cellEditor: 'agDateCellEditor', valueFormatter: dateFormatter, valueParser: dateParser, minWidth: 120 },
+      { headerName: 'Refund Date', field: 'refund_date', editable: true, 
+        cellEditor: DateCellEditor,
+        valueFormatter: dateFormatter, 
+        valueParser: dateParser,
+        suppressKeyboardEvent: (params: any) => {
+          // Prevent delete/backspace from clearing the cell when it has a value
+          if (params.event.key === 'Delete' || params.event.key === 'Backspace') {
+            if (params.node.data?.refund_date) {
+              return true; // suppress the event
+            }
+          }
+          return false;
+        },
+        minWidth: 120 },
 
       { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: true, minWidth: 160 },
       { headerName: 'Platform', field: 'platform', editable: false, valueGetter: p => computePlatform(p.data?.order_no ?? ''), minWidth: 110 },
@@ -432,7 +729,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         cellEditorParams: { values: ['Choose','Battery','board','Body issue','bought wrong device','Buttons','Camera','Change of mind','Charging','Charging Port','Cosmetic','Damage in transit','GPS','IC','Language','Lcd','Mic','Network','Overheating','OW','Screen','Software','Speaker','Wrong product','No issue','Other'] },
         minWidth: 160 },
 
-      { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Yes','No'] }, minWidth: 140 },
+      { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Yes','No'] }, minWidth: 140 },
 
       // Multiline, fixed width
       { headerName: 'Additional Notes', field: 'additional_notes', editable: true, wrapText: true, autoHeight: true, width: 260 },
@@ -448,7 +745,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           <div className="flex justify-end pr-1">
             <button
               className="rounded-md px-2 py-1 text-red-600 hover:bg-red-50"
-              onClick={() => p.data?.id && deleteSheet(businessId, p.data.id).then(refresh)}
+              onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
               title="Delete row"
             >
               <Trash2 className="h-4 w-4" />
@@ -478,8 +775,128 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     if (e.finished) reflowAutoHeight();
   }, [reflowAutoHeight]);
 
+  // Calculate status stats based on filtered data
+  const statusStats = useMemo(() => {
+    const blocked = filteredData.filter(row => 
+      row.blocked_by && row.blocked_by.trim() !== '' && row.blocked_by !== 'Choose'
+    ).length;
+
+    const unresolved = filteredData.filter(row => {
+      const isBlocked = row.blocked_by && row.blocked_by.trim() !== '' && row.blocked_by !== 'Choose';
+      const isNotResolved = !row.status || row.status.toLowerCase() !== 'resolved';
+      return !isBlocked && isNotResolved;
+    }).length;
+
+    const resolved = filteredData.filter(row => 
+      row.status && row.status.toLowerCase() === 'resolved'
+    ).length;
+
+    const total = filteredData.length;
+    const actionable = unresolved; // Cases that can be worked on (not blocked, not resolved)
+
+    return { blocked, unresolved, resolved, total, actionable };
+  }, [filteredData]);
+
   return (
     <div className="flex flex-col space-y-3 p-4 bg-white rounded-lg shadow-md">
+      {/* Filters Row */}
+      <div className="flex items-center justify-between mb-3 p-3 bg-gray-50 rounded-lg">
+        <div className="flex items-center gap-4">
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground font-medium">Date Range:</span>
+            </div>
+            <span className="text-sm text-muted-foreground">From:</span>
+            <Input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+              className="w-36"
+            />
+            <span className="text-sm text-muted-foreground">To:</span>
+            <Input
+              type="date"
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+              className="w-36"
+            />
+            {isDateFiltered && (
+              <Button variant="outline" size="sm" onClick={clearDateFilter}>
+                Clear
+              </Button>
+            )}
+          </div>
+          
+          {/* Platform Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground font-medium">Platform:</span>
+            <Select value={platformFilter} onValueChange={setPlatformFilter}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="All">All</SelectItem>
+                <SelectItem value="Amazon">Amazon</SelectItem>
+                <SelectItem value="Back Market">Back Market</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+        
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search by Order Number or Customer Name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 w-80"
+          />
+        </div>
+      </div>
+
+      {/* Status Stats */}
+      <div className="mb-2 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-sm font-semibold text-gray-700">Status Overview</h3>
+          <span className="text-xs text-gray-500">Updates with filters</span>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <div className="flex items-center gap-2 bg-red-50 px-3 py-2 rounded-md shadow-sm border border-red-100">
+            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+            <span className="text-red-700 font-medium text-sm">Blocked:</span>
+            <span className="text-lg font-bold text-red-800">{statusStats.blocked}</span>
+          </div>
+          <div className="flex items-center gap-2 bg-yellow-50 px-3 py-2 rounded-md shadow-sm border border-yellow-100">
+            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+            <span className="text-yellow-700 font-medium text-sm">Actionable:</span>
+            <span className="text-lg font-bold text-yellow-800">{statusStats.actionable}</span>
+          </div>
+          <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-md shadow-sm border border-green-100">
+            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+            <span className="text-green-700 font-medium text-sm">Resolved:</span>
+            <span className="text-lg font-bold text-green-800">{statusStats.resolved}</span>
+          </div>
+          <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-md shadow-sm border border-blue-100">
+            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+            <span className="text-blue-700 font-medium text-sm">Total:</span>
+            <span className="text-lg font-bold text-blue-800">{statusStats.total}</span>
+          </div>
+          {statusStats.total > 0 && (
+            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-md shadow-sm border border-slate-100">
+              <div className="w-3 h-3 bg-slate-500 rounded-full"></div>
+              <span className="text-slate-700 font-medium text-sm">Progress:</span>
+              <span className="text-lg font-bold text-slate-800">
+                {Math.round((statusStats.resolved / statusStats.total) * 100)}%
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Buttons Row */}
       <div className="flex items-center gap-2 mb-2">
         <Button className="gap-2" onClick={addRow}><Plus /> New Row</Button>
         <Button variant="outline" className="gap-2" onClick={removeSelected}><Trash2 /> Delete Selected</Button>
@@ -507,13 +924,13 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         {[
           ['#166534','Resolved'],
           ['#F59E0B','Awaiting Customer/BM'],
-          ['#1D4ED8','Awaiting G&I or Replacement info unknown'],
-          ['#F97316','Awaiting Softezm / Refund default / Replacement check'],
+          ['#1D4ED8','Awaiting G&I'],
+          ['#F97316','Awaiting Techezm'],
           ['#DB2777','Awaiting Replacement'],
-          ['#6B7280','Other blocked'],
-          ['#DC2626','Locked refund'],
-          ['#B45309','OOW refund'],
-          ['#22C55E','Unresolved fallback'],
+          ['#6B7280','Blocked'],
+          ['#DC2626','Locked'],
+          ['#B45309','OOW'],
+          ['#22C55E','Unresolved'],
         ].map(([hex,label])=>(
           <div key={hex} className="flex items-center gap-2 px-2 py-1 rounded border">
             <span style={{backgroundColor: hex, width: 14, height: 14, borderRadius: 3}} />
@@ -525,7 +942,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       <div className="ag-theme-alpine" style={{ width: '100%', height: '75vh', borderRadius: '0.5rem' }}>
         <AgGridReact<SheetRecord>
           onGridReady={onGridReady}
-          rowData={rowData}
+          rowData={filteredData}
           columnDefs={colDefs}
           rowSelection={{ mode: 'multiRow' }}
           animateRows
@@ -541,7 +958,6 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             resizable: true,
             filter: true,
             minWidth: 100,
-            // removed hover:bg-gray-50 to avoid white-out on hover
             cellClass: 'px-2 py-1 border border-gray-200',
           }}
           getRowId={p => String(p.data?.id ?? Math.random())}
@@ -552,6 +968,42 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           }}
         />
       </div>
+
+      {/* Single Row Delete Confirmation */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this row? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmSingleDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Bulk Delete Confirmation */}
+      <AlertDialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Bulk Delete</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete {selectedRowsForDeletion.length} selected row(s)? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setSelectedRowsForDeletion([])}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmBulkDelete} className="bg-red-600 hover:bg-red-700">
+              Delete {selectedRowsForDeletion.length} Row(s)
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

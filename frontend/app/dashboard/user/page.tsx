@@ -177,7 +177,6 @@ export default function UsersPage() {
           return;
         }
         // One-shot: force role to Business Admin
-        console.log('🧩 Creating new business + admin →', { newBizName, newUsername });
         await apiClient.createBusiness(newBizName.trim(), {
           username: newUsername.trim(),
           password: newPassword,
@@ -206,7 +205,6 @@ export default function UsersPage() {
           role_id: newRoleId, // 2 BA or 3 User
           business_id: Number(newBizId),
         };
-        console.log('🧩 Creating user under existing business →', payload);
         await apiClient.createUser(payload);
         setOpenCreate(false);
         resetCreateForm();
@@ -231,7 +229,6 @@ export default function UsersPage() {
         role_id: newRoleId, // BA or User (server will prevent BA from creating Superadmin anyway)
         business_id: Number(me.business_id),
       };
-      console.log('🧩 Creating user (BA scope) →', payload);
       await apiClient.createUser(payload);
       setOpenCreate(false);
       resetCreateForm();
