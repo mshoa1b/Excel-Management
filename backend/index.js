@@ -14,11 +14,25 @@ const backmarketCredsRoutes = require("./routes/backmarket");
 const app = express();
 
 // Middlewares
-app.use(cors({ origin: process.env.CORS_ORIGIN?.split(",") || true }));
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN?.split(",") || true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+};
+app.use(cors(corsOptions));
 app.use(express.json()); 
 
 // Health
 app.get("/", (_req, res) => res.send("SaaS Backend is running"));
+
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+  console.log('Origin:', req.get('Origin'));
+  console.log('Headers:', req.headers);
+  next();
+});
 
 // Mount SPECIFIC routers first
 app.use("/api/auth", authRoutes);                 
@@ -33,6 +47,11 @@ app.use("/api", backmarketCredsRoutes);
 // Add init route for one-time database setup
 const initRoutes = require("./routes/init");
 app.use("/api/init", initRoutes);
+
+// Handle OPTIONS requests explicitly
+app.options('*', (req, res) => {
+  res.status(200).end();
+});
 
 app.use((req, res) => {
   res.status(404).json({ message: `Not Found: ${req.method} ${req.originalUrl}` });
