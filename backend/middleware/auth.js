@@ -3,7 +3,11 @@
 // Expects tokens signed with HS256 and the same issuer/audience used when signing.
 
 const jwt = require("jsonwebtoken");
-require("dotenv").config();
+
+// Load environment variables from .env file (only in development)
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
 
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET) {
