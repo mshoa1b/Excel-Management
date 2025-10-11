@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://excel-management-nine.vercel.app/api/$1"
+    }
+  ]
+}
