@@ -15,7 +15,7 @@ export type SheetRecord = {
   platform: string;         // computed
   return_within_30_days: boolean; // computed
   issue: string;
-  out_of_warranty: boolean;
+  out_of_warranty: string;
 
   // Optional/display-only columns
   multiple_return?: string;

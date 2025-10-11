@@ -27,15 +27,6 @@ export default function StatsPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRange, setSelectedRange] = useState('1m');
 
-  // Debug logging
-  console.log('Stats Page Debug:', {
-    params,
-    businessId,
-    userBusinessId: user?.business_id,
-    userRole: user?.role?.name,
-    userId: user?.id
-  });
-
   useEffect(() => {
     loadStats();
   }, [businessId, selectedRange]);

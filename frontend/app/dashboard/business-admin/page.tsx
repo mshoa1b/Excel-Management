@@ -5,8 +5,6 @@ import Link from 'next/link';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
-import UserDebugInfo from '@/components/debug/UserDebugInfo';
-import RouteTestComponent from '@/components/debug/RouteTestComponent';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -79,12 +77,6 @@ export default function BusinessAdminDashboard() {
             <h1 className="text-3xl font-bold text-slate-800 mb-2">Business Admin Dashboard</h1>
             <p className="text-slate-600">Manage your business operations and view analytics</p>
           </div>
-
-          {/* Debug Information */}
-          <UserDebugInfo />
-          
-          {/* Route Testing */}
-          <RouteTestComponent />
 
           {/* Error banner */}
           {error && (

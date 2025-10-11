@@ -50,7 +50,7 @@ export default function Navigation() {
       case 'Business Admin':
         return [
           ...baseItems,
-          { href: `/sheets/${user.business_id}`, label: 'Sheets', icon: FileSpreadsheet },
+          { href: `/sheets/${user.business_id}`, label: 'Returns', icon: FileSpreadsheet },
           { href: `/stats/${user.business_id}`, label: 'Analytics', icon: BarChart3 },
           { href: '/manage', label: 'Manage', icon: Settings2 }
         ];

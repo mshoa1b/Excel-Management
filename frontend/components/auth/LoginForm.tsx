@@ -59,8 +59,6 @@ export default function LoginForm() {
       const resp = await apiClient.login(username.trim(), password) as AuthResponse;
       const canonicalUser = canonicalizeUser(resp.user);
 
-      // console.table(canonicalUser); // optional debug once
-
       storeAuth(resp.token, canonicalUser);
 
       switch (canonicalUser.role.name) {

@@ -47,11 +47,6 @@ export default function ProfilePage() {
 
     try {
       // Calls /api/users/me/password (requires current, new, confirm)
-            console.log('🔐 Changing my password with payload:', {
-        current_password: '***hidden***',
-        new_password_len: newPassword.length,
-        confirm_matches: newPassword === confirmPassword,
-      });
       
       await apiClient.changeMyPassword(currentPassword, newPassword);
 
