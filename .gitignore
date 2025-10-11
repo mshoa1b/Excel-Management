@@ -18,7 +18,9 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 
-# Environment files
+# Environment files (in backend and frontend)
+backend/.env*
+frontend/.env*
 .env
 .env.local
 .env.development.local
