@@ -106,7 +106,10 @@ router.post("/login", async (req, res) => {
         id: user.id,
         username: user.username,
         business_id: user.business_id ?? null,
-        role: { name: roleForFrontend }
+        role: { 
+          id: user.role_id,
+          name: roleForFrontend 
+        }
       }
     });
   } catch (err) {
@@ -185,7 +188,11 @@ router.post("/users", authenticateToken, async (req, res) => {
       [username, hash, role_id, targetBizId]
     );
 
-    res.status(201).json(shapeUser({ ...ins.rows[0], role_name: null }));
+    // Fetch role name for response
+    const roleRes = await pool.query('SELECT name FROM roles WHERE id = $1', [role_id]);
+    const roleName = roleRes.rows[0]?.name || 'User';
+
+    res.status(201).json(shapeUser({ ...ins.rows[0], role_name: roleName }));
   } catch (err) {
     console.error("POST /api/users error:", err);
     // unique_violation -> friendly message
