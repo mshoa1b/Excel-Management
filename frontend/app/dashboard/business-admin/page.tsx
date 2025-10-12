@@ -5,14 +5,13 @@ import Link from 'next/link';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
-import CurrencySettings from '@/components/business/CurrencySettings';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/hooks/useCurrency';
 import { apiClient } from '@/lib/api';
-import type { Stats, Sheet } from '@/types';
-import { FileSpreadsheet, DollarSign, TrendingUp, Calendar, ArrowRight } from 'lucide-react';
+import type { Stats } from '@/types';
+import { FileSpreadsheet, DollarSign, TrendingUp, ArrowRight } from 'lucide-react';
 
 
 
@@ -20,7 +19,6 @@ export default function BusinessAdminDashboard() {
   const { user, loading: authLoading } = useAuth();
   const { formatCurrency } = useCurrency(user?.business_id || '');
   const [stats, setStats] = useState<Stats | null>(null);
-  const [recentSheets, setRecentSheets] = useState<Sheet[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState<string>("");
 
@@ -41,13 +39,9 @@ export default function BusinessAdminDashboard() {
       setDataLoading(true);
       setError("");
       try {
-        const [statsData, sheetsData] = await Promise.all([
-          apiClient.getStats(bizId, '1m'),
-          apiClient.getSheets(bizId),
-        ]);
+        const statsData = await apiClient.getStats(bizId, '1m');
         if (cancelled) return;
         setStats(statsData);
-        setRecentSheets(Array.isArray(sheetsData) ? sheetsData.slice(0, 5) : []);
       } catch (e) {
         if (cancelled) return;
         setError(e instanceof Error ? e.message : 'Failed to load dashboard data');
@@ -115,7 +109,7 @@ export default function BusinessAdminDashboard() {
                 title="Unique Orders"
                 value={stats.uniqueOrders ?? 0}
                 description="Deduped by order no."
-                icon={Calendar}
+                icon={FileSpreadsheet}
               />
             </div>
           )}
@@ -126,11 +120,11 @@ export default function BusinessAdminDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
                   <FileSpreadsheet className="h-5 w-5 text-blue-600" />
-                  <span>Sheet Management</span>
+                  <span>Returns Management</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-slate-600 mb-4">Create, edit, and manage all your business sheets</p>
+                <p className="text-slate-600 mb-4">Create, edit, and manage all your business returns</p>
                 <Link href={bizId ? `/sheets/${bizId}` : '#'} aria-disabled={!bizId}>
                   <Button className="w-full" disabled={!bizId}>
                     Manage Sheets
@@ -158,49 +152,6 @@ export default function BusinessAdminDashboard() {
               </CardContent>
             </Card>
           </div>
-
-          {/* Currency Settings */}
-          {bizId && (
-            <CurrencySettings businessId={bizId} />
-          )}
-
-          {/* Recent Sheets */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Recent Sheets</CardTitle>
-              <Link href={bizId ? `/sheets/${bizId}` : '#'} aria-disabled={!bizId}>
-                <Button variant="outline" size="sm" disabled={!bizId}>
-                  View All
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {recentSheets.length === 0 ? (
-                  <p className="text-center text-slate-500 py-8">No sheets found</p>
-                ) : (
-                  recentSheets.map((sheet) => {
-                    const refund = Number(sheet.refund_amount ?? 0);
-                    return (
-                      <div
-                        key={sheet.id}
-                        className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0"
-                      >
-                        <div>
-                          <p className="font-medium text-slate-800">{sheet.order_no || '—'}</p>
-                          <p className="text-sm text-slate-500">{sheet.customer_name || '—'}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium text-slate-800">{formatCurrency(refund)}</p>
-                          <p className="text-sm text-slate-500">{sheet.return_type || '—'}</p>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </DashboardLayout>
     </ProtectedRoute>

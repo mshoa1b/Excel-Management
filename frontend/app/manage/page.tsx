@@ -630,7 +630,6 @@ export default function UsersPage() {
           {!isSuper && (
             <Card className="hover:shadow-sm transition-shadow duration-200">
               <CardHeader className="flex items-center justify-between">
-                <CardTitle className="w-full">Users in your business</CardTitle>
                 <div className="w-full max-w-xs">
                   <Input
                     value={qMine}
