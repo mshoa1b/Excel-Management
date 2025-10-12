@@ -90,8 +90,9 @@ export default function StatsPage() {
   };
   
   const generateRefundsPDF = async (data: any[], fromDate: string, toDate: string, platform: string) => {
-    // Dynamic import for client-side only
+    // Dynamic import for client-side only - import both jsPDF and autoTable
     const jsPDF = (await import('jspdf')).default;
+    // Import autoTable to extend jsPDF prototype
     await import('jspdf-autotable');
     
     const doc = new jsPDF();
@@ -121,7 +122,7 @@ export default function StatsPage() {
         row.platform || '-'
       ]);
     
-    // Add table
+    // Add table using the extended autoTable method
     (doc as any).autoTable({
       head: [['Refund Date', 'Order Number', 'Refund Amount', 'Platform']],
       body: tableData,
@@ -340,7 +341,7 @@ export default function StatsPage() {
                                 {dateFrom ? format(dateFrom, 'PPP') : 'Pick a date'}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
+                            <PopoverContent className="w-auto p-0 bg-white border shadow-md z-50" align="start">
                               <Calendar
                                 mode="single"
                                 selected={dateFrom}
@@ -363,7 +364,7 @@ export default function StatsPage() {
                                 {dateTo ? format(dateTo, 'PPP') : 'Pick a date'}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
+                            <PopoverContent className="w-auto p-0 bg-white border shadow-md z-50" align="start">
                               <Calendar
                                 mode="single"
                                 selected={dateTo}
