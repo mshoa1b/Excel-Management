@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 // import { Progress } from '@/components/ui/progress';
 import { Paperclip, Upload, X, Eye, Download, FileImage, AlertCircle } from 'lucide-react';
@@ -166,6 +166,9 @@ export function AttachmentManager({ sheetId, onAttachmentChange }: AttachmentMan
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Attachments for Row {sheetId}</DialogTitle>
+            <DialogDescription>
+              Upload and manage files for this row. Maximum 10 files per row.
+            </DialogDescription>
           </DialogHeader>
 
           {error && (
