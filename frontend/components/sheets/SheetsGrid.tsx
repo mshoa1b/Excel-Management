@@ -788,6 +788,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             <AttachmentManager 
               sheetId={p.data?.id} 
               attachmentCount={attachmentCounts[p.data?.id] || 0}
+              returnId={buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0)}
               onAttachmentChange={() => {
                 // Refresh attachment count for this row
                 if (p.data?.id) {

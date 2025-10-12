@@ -20,6 +20,7 @@ interface AttachmentManagerProps {
   sheetId: number;
   onAttachmentChange?: () => void;
   attachmentCount?: number;
+  returnId?: string;
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -34,7 +35,7 @@ const isImageFile = (mimeType: string): boolean => {
   return mimeType.startsWith('image/');
 };
 
-export function AttachmentManager({ sheetId, onAttachmentChange, attachmentCount }: AttachmentManagerProps) {
+export function AttachmentManager({ sheetId, onAttachmentChange, attachmentCount, returnId }: AttachmentManagerProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -162,7 +163,7 @@ export function AttachmentManager({ sheetId, onAttachmentChange, attachmentCount
         </DialogTrigger>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Attachments for Row {sheetId}</DialogTitle>
+            <DialogTitle>Attachments for Row {returnId || sheetId}</DialogTitle>
             <DialogDescription>
               Upload and manage files for this row. Maximum 10 files per row.
             </DialogDescription>
