@@ -42,6 +42,8 @@ export default function StatsPage() {
   const [dateTo, setDateTo] = useState<Date>(new Date());
   const [selectedPlatform, setSelectedPlatform] = useState('all');
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [dateFromOpen, setDateFromOpen] = useState(false);
+  const [dateToOpen, setDateToOpen] = useState(false);
 
   useEffect(() => {
     loadStats();
@@ -90,10 +92,8 @@ export default function StatsPage() {
   };
   
   const generateRefundsPDF = async (data: any[], fromDate: string, toDate: string, platform: string) => {
-    // Dynamic import for client-side only - import both jsPDF and autoTable
+    // Dynamic import for client-side only
     const jsPDF = (await import('jspdf')).default;
-    // Import autoTable to extend jsPDF prototype
-    await import('jspdf-autotable');
     
     const doc = new jsPDF();
     
@@ -106,40 +106,68 @@ export default function StatsPage() {
     doc.text(`Date Range: ${fromDate} to ${toDate}`, 20, 35);
     doc.text(`Platform: ${platform === 'all' ? 'All Platforms' : platform}`, 20, 45);
     
-    // Prepare table data
-    const tableData = data
-      .sort((a, b) => {
-        // Order by platform first, then by date
-        if (a.platform !== b.platform) {
-          return a.platform.localeCompare(b.platform);
-        }
-        return new Date(a.refund_date).getTime() - new Date(b.refund_date).getTime();
-      })
-      .map(row => [
-        format(new Date(row.refund_date), 'dd/MM/yyyy'),
-        row.order_number || '-',
-        row.refund_amount ? `$${parseFloat(row.refund_amount).toFixed(2)}` : '$0.00',
-        row.platform || '-'
-      ]);
-    
-    // Add table using the extended autoTable method
-    (doc as any).autoTable({
-      head: [['Refund Date', 'Order Number', 'Refund Amount', 'Platform']],
-      body: tableData,
-      startY: 60,
-      styles: {
-        fontSize: 10,
-        cellPadding: 3,
-      },
-      headStyles: {
-        fillColor: [59, 130, 246],
-        textColor: 255,
-        fontStyle: 'bold'
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252]
+    // Sort and process data
+    const sortedData = data.sort((a, b) => {
+      // Order by platform first, then by date
+      if (a.platform !== b.platform) {
+        return a.platform.localeCompare(b.platform);
       }
+      return new Date(a.refund_date).getTime() - new Date(b.refund_date).getTime();
     });
+    
+    // Create table manually
+    let yPosition = 65;
+    const columnWidths = [40, 50, 40, 40];
+    const columnPositions = [20, 60, 110, 150];
+    
+    // Table headers
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Refund Date', columnPositions[0], yPosition);
+    doc.text('Order Number', columnPositions[1], yPosition);
+    doc.text('Refund Amount', columnPositions[2], yPosition);
+    doc.text('Platform', columnPositions[3], yPosition);
+    
+    // Header line
+    yPosition += 5;
+    doc.line(20, yPosition, 190, yPosition);
+    yPosition += 10;
+    
+    // Table rows
+    doc.setFont('helvetica', 'normal');
+    sortedData.forEach((row, index) => {
+      if (yPosition > 270) {
+        doc.addPage();
+        yPosition = 20;
+      }
+      
+      const refundDate = format(new Date(row.refund_date), 'dd/MM/yyyy');
+      const orderNumber = (row.order_number || '-').substring(0, 12); // Truncate if too long
+      const refundAmount = row.refund_amount ? `$${parseFloat(row.refund_amount).toFixed(2)}` : '$0.00';
+      const platform = row.platform || '-';
+      
+      doc.text(refundDate, columnPositions[0], yPosition);
+      doc.text(orderNumber, columnPositions[1], yPosition);
+      doc.text(refundAmount, columnPositions[2], yPosition);
+      doc.text(platform, columnPositions[3], yPosition);
+      
+      yPosition += 8;
+    });
+    
+    // Summary
+    if (yPosition > 250) {
+      doc.addPage();
+      yPosition = 20;
+    }
+    
+    yPosition += 10;
+    doc.line(20, yPosition, 190, yPosition);
+    yPosition += 10;
+    
+    const totalAmount = sortedData.reduce((sum, row) => sum + (parseFloat(row.refund_amount) || 0), 0);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total Records: ${sortedData.length}`, 20, yPosition);
+    doc.text(`Total Refund Amount: $${totalAmount.toFixed(2)}`, 120, yPosition);
     
     // Save the PDF
     doc.save(`refunds-statement-${fromDate}-to-${toDate}.pdf`);
@@ -331,7 +359,7 @@ export default function StatsPage() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="date-from">From Date</Label>
-                          <Popover>
+                          <Popover open={dateFromOpen} onOpenChange={setDateFromOpen}>
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
@@ -341,11 +369,16 @@ export default function StatsPage() {
                                 {dateFrom ? format(dateFrom, 'PPP') : 'Pick a date'}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 bg-white border shadow-md z-50" align="start">
+                            <PopoverContent className="w-auto p-0" align="start">
                               <Calendar
                                 mode="single"
                                 selected={dateFrom}
-                                onSelect={(date) => date && setDateFrom(date)}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    setDateFrom(date);
+                                    setDateFromOpen(false);
+                                  }
+                                }}
                                 initialFocus
                               />
                             </PopoverContent>
@@ -354,7 +387,7 @@ export default function StatsPage() {
                         
                         <div className="space-y-2">
                           <Label htmlFor="date-to">To Date</Label>
-                          <Popover>
+                          <Popover open={dateToOpen} onOpenChange={setDateToOpen}>
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
@@ -364,11 +397,16 @@ export default function StatsPage() {
                                 {dateTo ? format(dateTo, 'PPP') : 'Pick a date'}
                               </Button>
                             </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0 bg-white border shadow-md z-50" align="start">
+                            <PopoverContent className="w-auto p-0" align="start">
                               <Calendar
                                 mode="single"
                                 selected={dateTo}
-                                onSelect={(date) => date && setDateTo(date)}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    setDateTo(date);
+                                    setDateToOpen(false);
+                                  }
+                                }}
                                 initialFocus
                               />
                             </PopoverContent>
