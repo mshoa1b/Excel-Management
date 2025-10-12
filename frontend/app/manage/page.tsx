@@ -813,7 +813,7 @@ export default function UsersPage() {
 
         {/* Back Market API Credentials Dialog */}
         <Dialog open={openCreds} onOpenChange={setOpenCreds}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
             <DialogHeader className="pb-4">
               <DialogTitle className="text-xl font-semibold">
                 Back Market API Configuration
@@ -828,7 +828,7 @@ export default function UsersPage() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6">
+            <div className="space-y-6 w-full">
               {/* Current Credentials Section */}
               {credsExists && credsMasked && (
                 <div className="space-y-3">
@@ -836,8 +836,8 @@ export default function UsersPage() {
                     <KeyRound className="h-4 w-4 text-green-600" />
                     <h4 className="text-sm font-medium text-green-700">Current Credentials</h4>
                   </div>
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-4 space-y-3">
-                    <div className="grid grid-cols-1 gap-3">
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-4 space-y-3 w-full">
+                    <div className="grid grid-cols-1 gap-3 w-full">
                       <div className="space-y-1">
                         <div className="text-xs font-medium text-green-700 uppercase tracking-wide">
                           API Key
@@ -860,7 +860,7 @@ export default function UsersPage() {
               )}
 
               {/* New/Update Credentials Section */}
-              <div className="space-y-4">
+              <div className="space-y-4 w-full">
                 <div className="flex items-center gap-2">
                   <PlugZap className="h-4 w-4 text-blue-600" />
                   <h4 className="text-sm font-medium text-blue-700">
@@ -868,11 +868,11 @@ export default function UsersPage() {
                   </h4>
                 </div>
                 
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                <div className="space-y-4 w-full">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 w-full">
                     <div className="flex items-start gap-2">
-                      <ShieldAlert className="h-4 w-4 text-blue-600 mt-0.5" />
-                      <div className="text-xs text-blue-700">
+                      <ShieldAlert className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-xs text-blue-700 flex-1">
                         <div className="font-medium mb-1">Security Note</div>
                         <div>Your credentials are encrypted and stored securely. Only enter new values if you need to update them.</div>
                       </div>
@@ -891,7 +891,7 @@ export default function UsersPage() {
                       value={credsKey}
                       onChange={(e) => setCredsKey(e.target.value)}
                       placeholder={credsExists ? 'Enter new API key (optional)' : 'Enter your API key'}
-                      className="font-mono text-sm"
+                      className="font-mono text-sm w-full"
                     />
                   </div>
 
@@ -905,7 +905,7 @@ export default function UsersPage() {
                       value={credsSecret}
                       onChange={(e) => setCredsSecret(e.target.value)}
                       placeholder={credsExists ? 'Enter new API secret (optional)' : 'Enter your API secret (optional)'}
-                      className="font-mono text-sm"
+                      className="font-mono text-sm w-full"
                     />
                   </div>
                 </div>
