@@ -784,7 +784,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         pinned: 'right',
         width: 120,
         cellRenderer: (p: any) => (
-          <div className="flex justify-end gap-1 pr-1 group">
+          <div className="flex justify-end gap-1 pr-1">
             <AttachmentManager 
               sheetId={p.data?.id} 
               attachmentCount={attachmentCounts[p.data?.id] || 0}
@@ -1020,6 +1020,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             cellClass: 'px-2 py-1 border border-gray-200',
           }}
           getRowId={p => String(p.data?.id ?? Math.random())}
+          getRowClass={() => 'group'}
           getRowStyle={(params) => {
             const bg = colorForRow(params.data);
             const color = pickTextColor(bg);
