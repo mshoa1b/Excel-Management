@@ -561,13 +561,23 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
   // Save edits
   const onCellValueChanged = async (event: CellValueChangedEvent<SheetRecord>) => {
+    console.log('🔄 onCellValueChanged triggered:', {
+      field: event.colDef.field,
+      oldValue: event.oldValue,
+      newValue: event.newValue,
+      rowId: event.data?.id
+    });
+    
     const r = event.data;
-    if (!r?.id) return;
+    if (!r?.id) {
+      console.log('❌ No row ID, skipping update');
+      return;
+    }
 
     // Debug logging for date changes
     const changedField = event.colDef.field as string | undefined;
     if (changedField && ['date_received', 'order_date', 'refund_date'].includes(changedField)) {
-      console.log('Date field changed:', {
+      console.log('📅 Date field changed:', {
         field: changedField,
         oldValue: event.oldValue,
         newValue: event.newValue,
@@ -619,27 +629,36 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       getValue: () => {
         // Convert display format back to YYYY-MM-DD for storage
         const finalValue = toYMD(value) || '';
-        console.log('DateCellEditor getValue:', { 
+        console.log('🎯 DateCellEditor getValue called:', { 
           displayValue: value, 
           finalValue, 
           originalValue: props.value 
         });
         return finalValue;
       },
-      isCancelBeforeStart: () => false,
-      isCancelAfterEnd: () => false,
+      isCancelBeforeStart: () => {
+        console.log('🚫 isCancelBeforeStart called');
+        return false;
+      },
+      isCancelAfterEnd: () => {
+        console.log('🚫 isCancelAfterEnd called');
+        return false;
+      },
+      // Add afterGuiAttached method for proper cell editor lifecycle
+      afterGuiAttached: () => {
+        console.log('📎 afterGuiAttached called');
+        if (inputRef.current) {
+          inputRef.current.focus();
+          inputRef.current.select();
+        }
+      }
     }));
 
     React.useEffect(() => {
       // Initialize with formatted display value
       const initialValue = props.value ? format(new Date(props.value), 'dd/MM/yyyy') : '';
       setValue(initialValue);
-      
-      // Focus and select the input
-      if (inputRef.current) {
-        inputRef.current.focus();
-        inputRef.current.select();
-      }
+      console.log('📅 DateCellEditor initialized with:', { originalValue: props.value, displayValue: initialValue });
     }, [props.value]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -667,9 +686,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     };
 
     const handleBlur = () => {
-      // Stop editing when focus leaves the input
-      console.log('Date editor blur, stopping editing with value:', value);
-      props.stopEditing();
+      // Let ag-Grid's stopEditingWhenCellsLoseFocus handle this
+      console.log('📤 Date editor blur with value:', value);
+      // Don't manually call stopEditing - let ag-Grid handle it
     };
 
     return (
