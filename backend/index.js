@@ -54,7 +54,8 @@ app.get("/", (_req, res) => {
       NODE_ENV: process.env.NODE_ENV,
       JWT_SECRET: process.env.JWT_SECRET ? "✅ Set" : "❌ Missing",
       DATABASE_URL: process.env.DATABASE_URL ? "✅ Set" : "❌ Missing",
-      CORS_ORIGIN: process.env.CORS_ORIGIN || "Not set"
+      CORS_ORIGIN: process.env.CORS_ORIGIN || "Not set",
+      IONOS_SFTP_HOST: process.env.IONOS_SFTP_HOST ? "✅ Set" : "❌ Missing"
     }
   };
   res.json(envCheck);

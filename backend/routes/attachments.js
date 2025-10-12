@@ -105,7 +105,12 @@ router.post('/upload/:sheetId', authenticateToken, upload.array('files', 10), as
     });
   } catch (error) {
     console.error('Upload error:', error);
-    res.status(500).json({ message: 'Failed to upload files', error: error.message });
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      message: 'Failed to upload files', 
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
   }
 });
 
