@@ -618,7 +618,13 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     React.useImperativeHandle(ref, () => ({
       getValue: () => {
         // Convert display format back to YYYY-MM-DD for storage
-        return toYMD(value) || props.value || '';
+        const finalValue = toYMD(value) || '';
+        console.log('DateCellEditor getValue:', { 
+          displayValue: value, 
+          finalValue, 
+          originalValue: props.value 
+        });
+        return finalValue;
       },
       isCancelBeforeStart: () => false,
       isCancelAfterEnd: () => false,
@@ -660,6 +666,12 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       }
     };
 
+    const handleBlur = () => {
+      // Stop editing when focus leaves the input
+      console.log('Date editor blur, stopping editing with value:', value);
+      props.stopEditing();
+    };
+
     return (
       <input
         ref={inputRef}
@@ -667,6 +679,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onBlur={handleBlur}
         placeholder="dd/MM/yyyy"
         className="w-full h-full px-2 border-none outline-none bg-white"
         style={{ height: '100%', border: 'none', outline: 'none' }}
