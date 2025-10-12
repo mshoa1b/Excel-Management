@@ -189,11 +189,32 @@ class ApiClient {
       formData.append('files', file);
     });
     
-    return this.request(`/attachments/upload/${sheetId}`, {
+    // For file uploads, we need to use fetch directly to avoid Content-Type header
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const url = `${API_BASE_URL}/attachments/upload/${sheetId}`;
+    
+    return fetch(url, {
       method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        // Don't set Content-Type - let browser set it with multipart boundary
+      },
       body: formData,
-      // Don't set Content-Type header - let browser set it with boundary
-      headers: {}
+    }).then(async (res) => {
+      if (!res.ok) {
+        if (res.status === 401) {
+          if (typeof window !== "undefined") {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            window.location.href = "/login";
+          }
+          throw new Error("Unauthorized");
+        }
+        const errorMessage = await this.parseError(res);
+        throw new Error(errorMessage);
+      }
+      const text = await res.text();
+      return text ? JSON.parse(text) : {};
     });
   }
 
