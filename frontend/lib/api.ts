@@ -228,12 +228,16 @@ class ApiClient {
 
   getAttachmentViewUrl(attachmentId: number) {
     const baseUrl = getApiBaseUrl().replace('/api', '');
-    return `${baseUrl}/api/attachments/view/${attachmentId}`;
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `${baseUrl}/api/attachments/view/${attachmentId}${tokenParam}`;
   }
 
   getAttachmentDownloadUrl(attachmentId: number) {
     const baseUrl = getApiBaseUrl().replace('/api', '');
-    return `${baseUrl}/api/attachments/download/${attachmentId}`;
+    const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+    const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `${baseUrl}/api/attachments/download/${attachmentId}${tokenParam}`;
   }
 }
 

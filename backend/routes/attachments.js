@@ -3,6 +3,7 @@ const multer = require('multer');
 const path = require('path');
 const crypto = require('crypto');
 const authenticateToken = require('../middleware/auth');
+const optionalAuth = require('../middleware/optionalAuth');
 const sftpManager = require('../lib/sftp');
 const {
   createAttachment,
@@ -142,7 +143,7 @@ router.get('/sheet/:sheetId', authenticateToken, async (req, res) => {
 });
 
 // GET /api/attachments/download/:attachmentId
-router.get('/download/:attachmentId', authenticateToken, async (req, res) => {
+router.get('/download/:attachmentId', optionalAuth, async (req, res) => {
   try {
     const attachmentId = parseInt(req.params.attachmentId);
     const attachment = await getAttachmentById(attachmentId);
@@ -168,7 +169,7 @@ router.get('/download/:attachmentId', authenticateToken, async (req, res) => {
 });
 
 // GET /api/attachments/view/:attachmentId (for viewing in browser)
-router.get('/view/:attachmentId', authenticateToken, async (req, res) => {
+router.get('/view/:attachmentId', optionalAuth, async (req, res) => {
   try {
     const attachmentId = parseInt(req.params.attachmentId);
     const attachment = await getAttachmentById(attachmentId);
