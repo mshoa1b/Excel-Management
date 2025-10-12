@@ -46,26 +46,37 @@ class SFTPManager {
   }
 
   async uploadFile(buffer, businessId, sheetId, filename) {
-    await this.connect();
+    console.log('SFTP uploadFile called with:', { businessId, sheetId, filename, bufferSize: buffer.length });
     
     try {
+      await this.connect();
+      console.log('SFTP connection established');
+      
       // Create directory structure: /uploads/attachments/business_123/sheet_456/
       const businessDir = path.join(this.basePath, `business_${businessId}`);
       const sheetDir = path.join(businessDir, `sheet_${sheetId}`);
       
+      console.log('Creating directories:', { businessDir, sheetDir });
       await this.ensureDirectory(businessDir);
       await this.ensureDirectory(sheetDir);
       
       const filePath = path.join(sheetDir, filename);
+      console.log('Final file path:', filePath);
       
       // Upload file
+      console.log('Starting SFTP put operation...');
       await this.sftp.put(buffer, filePath);
       
       console.log(`File uploaded successfully: ${filePath}`);
       return filePath;
     } catch (error) {
-      console.error('SFTP upload error:', error);
-      throw new Error('Failed to upload file to SFTP server');
+      console.error('SFTP upload error details:', {
+        message: error.message,
+        code: error.code,
+        level: error.level,
+        stack: error.stack
+      });
+      throw new Error(`Failed to upload file to SFTP server: ${error.message}`);
     }
   }
 

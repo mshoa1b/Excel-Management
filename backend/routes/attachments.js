@@ -66,21 +66,28 @@ router.post('/upload/:sheetId', authenticateToken, upload.array('files', 10), as
 
     for (const file of files) {
       try {
+        console.log('Processing file:', file.originalname, 'Size:', file.size);
+        
         // Generate unique filename
         const fileExtension = path.extname(file.originalname);
         const timestamp = Date.now();
         const randomString = crypto.randomBytes(6).toString('hex');
         const filename = `${timestamp}_${randomString}${fileExtension}`;
+        
+        console.log('Generated filename:', filename);
 
         // Upload to SFTP
+        console.log('Starting SFTP upload...');
         const sftpPath = await sftpManager.uploadFile(
           file.buffer,
           businessId,
           sheetId,
           filename
         );
+        console.log('SFTP upload completed, path:', sftpPath);
 
         // Save attachment metadata to database
+        console.log('Saving to database...');
         const attachment = await createAttachment({
           sheet_id: sheetId,
           business_id: businessId,
@@ -91,6 +98,7 @@ router.post('/upload/:sheetId', authenticateToken, upload.array('files', 10), as
           sftp_path: sftpPath,
           uploaded_by: userId
         });
+        console.log('Database save completed');
 
         uploadedAttachments.push(attachment);
       } catch (fileError) {
