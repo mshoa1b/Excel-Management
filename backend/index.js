@@ -43,8 +43,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json()); 
 
-// Handle preflight requests explicitly
-app.options('*', cors(corsOptions));
+// CORS middleware handles preflight requests automatically
 
 // Health check with environment info
 app.get("/", (_req, res) => {
