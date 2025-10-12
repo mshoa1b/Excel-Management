@@ -77,7 +77,9 @@ export default function BusinessAdminDashboard() {
       <DashboardLayout>
         <div className="space-y-8">
           <div>
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">Business Admin Dashboard</h1>
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">
+              {user?.business?.name ? `${user.business.name} Dashboard` : 'Business Admin Dashboard'}
+            </h1>
             <p className="text-slate-600">Manage your business operations and view analytics</p>
           </div>
 

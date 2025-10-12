@@ -561,32 +561,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
   // Save edits
   const onCellValueChanged = async (event: CellValueChangedEvent<SheetRecord>) => {
-    console.log('🔄 onCellValueChanged triggered:', {
-      field: event.colDef.field,
-      oldValue: event.oldValue,
-      newValue: event.newValue,
-      rowId: event.data?.id
-    });
-    
     const r = event.data;
-    if (!r?.id) {
-      console.log('❌ No row ID, skipping update');
-      return;
-    }
-
-    // Debug logging for date changes
-    const changedField = event.colDef.field as string | undefined;
-    if (changedField && ['date_received', 'order_date', 'refund_date'].includes(changedField)) {
-      console.log('📅 Date field changed:', {
-        field: changedField,
-        oldValue: event.oldValue,
-        newValue: event.newValue,
-        parsedValue: toYMD(event.newValue)
-      });
-      
-      // Allow the change to proceed - remove the blocking logic
-      // The dateParser will handle the conversion properly
-    }
+    if (!r?.id) return;
 
     const payload = normalizeForSave(r);
 
@@ -625,20 +601,13 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   // Formatters and parsers
   const dateFormatter = (p: any) => (p.value ? format(new Date(p.value), 'dd/MM/yyyy') : '');
   const dateParser = (p: any) => {
-    console.log('🔄 Date parser called:', { input: p.newValue, oldValue: p.oldValue });
-    
     // If newValue is null, undefined, or empty string, allow clearing the date
     if (p.newValue == null || p.newValue === '') {
-      console.log('📝 Clearing date');
       return '';
     }
     
-    // Try to parse the new value
-    const parsed = toYMD(p.newValue);
-    console.log('📅 Date parsed:', { input: p.newValue, output: parsed });
-    
-    // Return the parsed value (toYMD already handles invalid dates by returning '')
-    return parsed;
+    // Try to parse the new value and return it (toYMD already handles invalid dates by returning '')
+    return toYMD(p.newValue);
   };
   const numberParser = (p: any) => {
     const n = parseFloat(p.newValue);

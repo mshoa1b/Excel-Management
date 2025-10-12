@@ -2,7 +2,7 @@ import './globals.css';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'SaaS Management System',
+  title: 'Techezm RMA',
   description: 'Multi-tenant SaaS platform for business management',
 };
 
