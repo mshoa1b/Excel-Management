@@ -42,13 +42,13 @@ const corsOptions = {
 };
 app.use(cors(corsOptions));
 
-// Conditional JSON parsing - skip for multipart form data
+// Conditional JSON parsing - skip for attachment upload routes
 app.use((req, res, next) => {
-  if (req.headers['content-type'] && req.headers['content-type'].startsWith('multipart/form-data')) {
-    // Skip JSON parsing for multipart requests (file uploads)
+  // Skip JSON parsing for attachment upload routes
+  if (req.url.includes('/api/attachments/upload')) {
     next();
   } else {
-    // Apply JSON parsing for other requests
+    // Apply JSON parsing for other routes
     express.json()(req, res, next);
   }
 });
