@@ -203,4 +203,52 @@ router.delete("/:businessId", authenticateToken, assertBusinessScope, async (req
   }
 });
 
+// GET /api/sheets/:businessId/refunds-report - Get filtered refunds data for PDF report
+router.get("/:businessId/refunds-report", authenticateToken, assertBusinessScope, async (req, res) => {
+  try {
+    const businessId = Number(req.params.businessId);
+    const { dateFrom, dateTo, platform } = req.query;
+    
+    if (!dateFrom || !dateTo) {
+      return res.status(400).json({ message: "dateFrom and dateTo are required" });
+    }
+    
+    // Build the query based on platform filter
+    let platformCondition = '';
+    const params = [businessId, dateFrom, dateTo];
+    
+    if (platform && platform !== 'all') {
+      platformCondition = 'AND platform = $4';
+      params.push(platform);
+    }
+    
+    const query = `
+      SELECT 
+        id,
+        order_no as order_number,
+        refund_date,
+        COALESCE(refund_amount, 0)::float AS refund_amount,
+        platform,
+        customer_name,
+        date_received
+      FROM sheets 
+      WHERE business_id = $1 
+        AND refund_date IS NOT NULL
+        AND refund_date >= $2 
+        AND refund_date <= $3
+        ${platformCondition}
+      ORDER BY 
+        platform ASC,
+        refund_date ASC
+    `;
+    
+    const { rows } = await pool.query(query, params);
+    
+    res.json(rows);
+  } catch (err) {
+    console.error("GET /api/sheets/:businessId/refunds-report error:", err);
+    res.status(500).json({ message: "Failed to fetch refunds report data" });
+  }
+});
+
 module.exports = router;

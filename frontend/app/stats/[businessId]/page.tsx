@@ -9,15 +9,23 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/hooks/useCurrency';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { apiClient } from '@/lib/api';
 import { Stats } from '@/types';
+import { format } from 'date-fns';
 import { 
   FileSpreadsheet, 
   DollarSign, 
   TrendingUp, 
-  Calendar, 
+  Calendar as CalendarIcon, 
   Clock, 
-  AlertTriangle 
+  AlertTriangle,
+  FileText,
+  Download
 } from 'lucide-react';
 
 export default function StatsPage() {
@@ -28,6 +36,12 @@ export default function StatsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedRange, setSelectedRange] = useState('1m');
+  
+  // Refunds Statement state
+  const [dateFrom, setDateFrom] = useState<Date>(new Date());
+  const [dateTo, setDateTo] = useState<Date>(new Date());
+  const [selectedPlatform, setSelectedPlatform] = useState('all');
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   useEffect(() => {
     loadStats();
@@ -43,6 +57,91 @@ export default function StatsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGenerateRefundsReport = async () => {
+    try {
+      setGeneratingPdf(true);
+      
+      // Format dates for API
+      const fromDate = format(dateFrom, 'yyyy-MM-dd');
+      const toDate = format(dateTo, 'yyyy-MM-dd');
+      
+      // Fetch filtered data from API
+      const params = new URLSearchParams({
+        dateFrom: fromDate,
+        dateTo: toDate,
+        platform: selectedPlatform
+      });
+      
+      const response = await apiClient.request(`/sheets/${businessId}/refunds-report?${params}`);
+      
+      const data = response;
+      
+      // Generate PDF
+      await generateRefundsPDF(data, fromDate, toDate, selectedPlatform);
+      
+    } catch (error) {
+      console.error('Error generating refunds report:', error);
+      alert('Failed to generate refunds report. Please try again.');
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+  
+  const generateRefundsPDF = async (data: any[], fromDate: string, toDate: string, platform: string) => {
+    // Dynamic import for client-side only
+    const jsPDF = (await import('jspdf')).default;
+    await import('jspdf-autotable');
+    
+    const doc = new jsPDF();
+    
+    // Title
+    doc.setFontSize(20);
+    doc.text('Refunds Statement', 20, 20);
+    
+    // Date range and platform info
+    doc.setFontSize(12);
+    doc.text(`Date Range: ${fromDate} to ${toDate}`, 20, 35);
+    doc.text(`Platform: ${platform === 'all' ? 'All Platforms' : platform}`, 20, 45);
+    
+    // Prepare table data
+    const tableData = data
+      .sort((a, b) => {
+        // Order by platform first, then by date
+        if (a.platform !== b.platform) {
+          return a.platform.localeCompare(b.platform);
+        }
+        return new Date(a.refund_date).getTime() - new Date(b.refund_date).getTime();
+      })
+      .map(row => [
+        format(new Date(row.refund_date), 'dd/MM/yyyy'),
+        row.order_number || '-',
+        row.refund_amount ? `$${parseFloat(row.refund_amount).toFixed(2)}` : '$0.00',
+        row.platform || '-'
+      ]);
+    
+    // Add table
+    (doc as any).autoTable({
+      head: [['Refund Date', 'Order Number', 'Refund Amount', 'Platform']],
+      body: tableData,
+      startY: 60,
+      styles: {
+        fontSize: 10,
+        cellPadding: 3,
+      },
+      headStyles: {
+        fillColor: [59, 130, 246],
+        textColor: 255,
+        fontStyle: 'bold'
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      }
+    });
+    
+    // Save the PDF
+    doc.save(`refunds-statement-${fromDate}-to-${toDate}.pdf`);
   };
 
   const getRangeLabel = (range: string) => {
@@ -211,6 +310,95 @@ export default function StatsPage() {
                         <span className="text-slate-600">Total Orders</span>
                         <span className="font-bold text-lg">{stats.totalOrders}</span>
                       </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {/* Refunds Statement Card */}
+              <div className="mt-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <FileText className="h-5 w-5 text-purple-600" />
+                      <span>Refunds Statement</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-6">
+                      {/* Date Range Selection */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="date-from">From Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start text-left font-normal"
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {dateFrom ? format(dateFrom, 'PPP') : 'Pick a date'}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={dateFrom}
+                                onSelect={(date) => date && setDateFrom(date)}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="date-to">To Date</Label>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start text-left font-normal"
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {dateTo ? format(dateTo, 'PPP') : 'Pick a date'}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={dateTo}
+                                onSelect={(date) => date && setDateTo(date)}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                      
+                      {/* Platform Selection */}
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-select">Platform</Label>
+                        <Select value={selectedPlatform} onValueChange={setSelectedPlatform}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select platform" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Platforms</SelectItem>
+                            <SelectItem value="Backmarket">Backmarket</SelectItem>
+                            <SelectItem value="Amazon">Amazon</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {/* Generate Button */}
+                      <Button 
+                        onClick={handleGenerateRefundsReport} 
+                        disabled={generatingPdf || !dateFrom || !dateTo}
+                        className="w-full"
+                      >
+                        <Download className="mr-2 h-4 w-4" />
+                        {generatingPdf ? 'Generating PDF...' : 'Generate Refunds Statement'}
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
