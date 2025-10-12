@@ -142,31 +142,6 @@ export default function UserDashboard() {
                 </div>
               </CardContent>
             </Card>
-
-            <Card className="hover:shadow-lg transition-shadow duration-300">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5 text-green-600" />
-                  View Analytics
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-slate-600 text-sm">
-                  View detailed analytics and statistics for your business operations.
-                </p>
-                <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-500">
-                    Real-time data
-                  </span>
-                  <Link href={`/stats/${bizId}`}>
-                    <Button variant="outline" className="group">
-                      View Stats
-                      <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </Button>
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Business Information */}

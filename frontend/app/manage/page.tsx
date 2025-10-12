@@ -813,60 +813,132 @@ export default function UsersPage() {
 
         {/* Back Market API Credentials Dialog */}
         <Dialog open={openCreds} onOpenChange={setOpenCreds}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>
-                Back Market API {credsBizName ? `— ${credsBizName}` : ''}
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader className="pb-4">
+              <DialogTitle className="text-xl font-semibold">
+                Back Market API Configuration
               </DialogTitle>
-              <DialogDescription>
-                Add or update credentials. Deleting removes them entirely.
+              {credsBizName && (
+                <div className="text-sm text-muted-foreground font-medium">
+                  {credsBizName}
+                </div>
+              )}
+              <DialogDescription className="text-sm">
+                Manage your Back Market API credentials for automated integration.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="grid gap-4 py-2">
+            <div className="space-y-6">
+              {/* Current Credentials Section */}
               {credsExists && credsMasked && (
-                <div className="rounded-md border p-3 text-sm bg-slate-50">
-                  <div className="mb-1 text-slate-600">Current (masked):</div>
-                  <div>API Key: <span className="font-mono">{credsMasked.key || '—'}</span></div>
-                  <div>API Secret: <span className="font-mono">{credsMasked.secret || '—'}</span></div>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <KeyRound className="h-4 w-4 text-green-600" />
+                    <h4 className="text-sm font-medium text-green-700">Current Credentials</h4>
+                  </div>
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-4 space-y-3">
+                    <div className="grid grid-cols-1 gap-3">
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium text-green-700 uppercase tracking-wide">
+                          API Key
+                        </div>
+                        <div className="text-sm font-mono text-green-800 bg-white px-3 py-2 rounded border">
+                          {credsMasked.key || '—'}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs font-medium text-green-700 uppercase tracking-wide">
+                          API Secret
+                        </div>
+                        <div className="text-sm font-mono text-green-800 bg-white px-3 py-2 rounded border">
+                          {credsMasked.secret || '—'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              <div className="grid gap-2">
-                <Label>API Key {credsExists ? '(leave empty to keep current)' : '(required to save)'}</Label>
-                <Input
-                  value={credsKey}
-                  onChange={(e) => setCredsKey(e.target.value)}
-                  placeholder={credsExists ? '••••• (optional if not changing)' : 'Enter API key'}
-                />
-              </div>
+              {/* New/Update Credentials Section */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <PlugZap className="h-4 w-4 text-blue-600" />
+                  <h4 className="text-sm font-medium text-blue-700">
+                    {credsExists ? 'Update Credentials' : 'Add Credentials'}
+                  </h4>
+                </div>
+                
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <div className="flex items-start gap-2">
+                      <ShieldAlert className="h-4 w-4 text-blue-600 mt-0.5" />
+                      <div className="text-xs text-blue-700">
+                        <div className="font-medium mb-1">Security Note</div>
+                        <div>Your credentials are encrypted and stored securely. Only enter new values if you need to update them.</div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="api-key" className="text-sm font-medium">
+                      API Key
+                      <span className="text-xs text-muted-foreground ml-2">
+                        {credsExists ? '(leave empty to keep current)' : '(required)'}
+                      </span>
+                    </Label>
+                    <Input
+                      id="api-key"
+                      value={credsKey}
+                      onChange={(e) => setCredsKey(e.target.value)}
+                      placeholder={credsExists ? 'Enter new API key (optional)' : 'Enter your API key'}
+                      className="font-mono text-sm"
+                    />
+                  </div>
 
-              <div className="grid gap-2">
-                <Label>API Secret (optional)</Label>
-                <Input
-                  value={credsSecret}
-                  onChange={(e) => setCredsSecret(e.target.value)}
-                  placeholder={credsExists ? '••••• (optional if not changing)' : 'Enter API secret (optional)'}
-                />
+                  <div className="space-y-2">
+                    <Label htmlFor="api-secret" className="text-sm font-medium">
+                      API Secret
+                      <span className="text-xs text-muted-foreground ml-2">(optional)</span>
+                    </Label>
+                    <Input
+                      id="api-secret"
+                      value={credsSecret}
+                      onChange={(e) => setCredsSecret(e.target.value)}
+                      placeholder={credsExists ? 'Enter new API secret (optional)' : 'Enter your API secret (optional)'}
+                      className="font-mono text-sm"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            <DialogFooter className="justify-between">
+            <DialogFooter className="flex-col space-y-3 sm:flex-row sm:space-y-0 sm:justify-between pt-6 border-t">
               <div>
                 {credsExists && (
-                  <Button variant="destructive" onClick={handleDeleteCreds} disabled={busy}>
+                  <Button 
+                    variant="destructive" 
+                    onClick={handleDeleteCreds} 
+                    disabled={busy}
+                    className="w-full sm:w-auto"
+                  >
                     <Trash className="h-4 w-4 mr-2" />
-                    Delete
+                    Delete Credentials
                   </Button>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col-reverse sm:flex-row gap-2 w-full sm:w-auto">
                 <DialogClose asChild>
-                  <Button variant="outline">Close</Button>
+                  <Button variant="outline" className="w-full sm:w-auto">
+                    Cancel
+                  </Button>
                 </DialogClose>
-                <Button onClick={handleSaveCreds} disabled={busy || (!credsKey.trim() && !credsExists)}>
+                <Button 
+                  onClick={handleSaveCreds} 
+                  disabled={busy || (!credsKey.trim() && !credsExists)}
+                  className="w-full sm:w-auto"
+                >
                   <Pencil className="h-4 w-4 mr-2" />
-                  Save
+                  {credsExists ? 'Update Credentials' : 'Save Credentials'}
                 </Button>
               </div>
             </DialogFooter>

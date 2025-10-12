@@ -127,7 +127,7 @@ export default function BusinessAdminDashboard() {
                 <p className="text-slate-600 mb-4">Create, edit, and manage all your business returns</p>
                 <Link href={bizId ? `/sheets/${bizId}` : '#'} aria-disabled={!bizId}>
                   <Button className="w-full" disabled={!bizId}>
-                    Manage Sheets
+                    Manage Returns
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
