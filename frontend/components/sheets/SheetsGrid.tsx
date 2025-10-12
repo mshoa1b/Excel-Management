@@ -620,117 +620,24 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     apiRef.current?.redrawRows?.({ rowNodes: [event.node] });
   };
 
-  // Custom Date Cell Editor Component
-  const DateCellEditor = React.forwardRef((props: any, ref: any) => {
-    const [value, setValue] = React.useState('');
-    const inputRef = React.useRef<HTMLInputElement>(null);
-
-    React.useImperativeHandle(ref, () => ({
-      getValue: () => {
-        // Convert display format back to YYYY-MM-DD for storage
-        const finalValue = toYMD(value) || '';
-        console.log('🎯 DateCellEditor getValue called:', { 
-          displayValue: value, 
-          finalValue, 
-          originalValue: props.value 
-        });
-        return finalValue;
-      },
-      isCancelBeforeStart: () => {
-        console.log('🚫 isCancelBeforeStart called');
-        return false;
-      },
-      isCancelAfterEnd: () => {
-        console.log('🚫 isCancelAfterEnd called');
-        return false;
-      },
-      // Add afterGuiAttached method for proper cell editor lifecycle
-      afterGuiAttached: () => {
-        console.log('📎 afterGuiAttached called');
-        if (inputRef.current) {
-          inputRef.current.focus();
-          inputRef.current.select();
-        }
-      }
-    }));
-
-    React.useEffect(() => {
-      // Initialize with formatted display value
-      const initialValue = props.value ? format(new Date(props.value), 'dd/MM/yyyy') : '';
-      setValue(initialValue);
-      console.log('📅 DateCellEditor initialized with:', { originalValue: props.value, displayValue: initialValue });
-    }, [props.value]);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      let newValue = e.target.value;
-      
-      // Auto-format as user types (add slashes)
-      newValue = newValue.replace(/\D/g, ''); // Remove non-digits
-      if (newValue.length >= 2) {
-        newValue = newValue.slice(0, 2) + '/' + newValue.slice(2);
-      }
-      if (newValue.length >= 5) {
-        newValue = newValue.slice(0, 5) + '/' + newValue.slice(5, 9);
-      }
-      
-      setValue(newValue);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        props.stopEditing();
-      } else if (e.key === 'Escape') {
-        setValue(props.value ? format(new Date(props.value), 'dd/MM/yyyy') : '');
-        props.stopEditing();
-      }
-    };
-
-    const handleBlur = () => {
-      // Let ag-Grid's stopEditingWhenCellsLoseFocus handle this
-      console.log('📤 Date editor blur with value:', value);
-      // Don't manually call stopEditing - let ag-Grid handle it
-    };
-
-    return (
-      <input
-        ref={inputRef}
-        type="text"
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        onBlur={handleBlur}
-        placeholder="dd/MM/yyyy"
-        className="w-full h-full px-2 border-none outline-none bg-white"
-        style={{ height: '100%', border: 'none', outline: 'none' }}
-      />
-    );
-  });
-
-  DateCellEditor.displayName = 'DateCellEditor';
+  // Remove custom DateCellEditor - using ag-Grid's built-in agDateStringCellEditor instead
 
   // Formatters and parsers
   const dateFormatter = (p: any) => (p.value ? format(new Date(p.value), 'dd/MM/yyyy') : '');
   const dateParser = (p: any) => {
-    // If newValue is null or undefined, return empty string to clear the date
-    if (p.newValue == null) {
-      return '';
-    }
+    console.log('🔄 Date parser called:', { input: p.newValue, oldValue: p.oldValue });
     
-    // If newValue is empty string, allow clearing the date
-    if (p.newValue === '') {
+    // If newValue is null, undefined, or empty string, allow clearing the date
+    if (p.newValue == null || p.newValue === '') {
+      console.log('📝 Clearing date');
       return '';
     }
     
     // Try to parse the new value
     const parsed = toYMD(p.newValue);
-    console.log('Date parser:', { input: p.newValue, output: parsed });
+    console.log('📅 Date parsed:', { input: p.newValue, output: parsed });
     
-    // If parsing failed, return the old value to prevent corruption
-    if (!parsed || parsed === '') {
-      console.warn('Date parsing failed, keeping old value:', p.oldValue);
-      return p.oldValue || '';
-    }
-    
+    // Return the parsed value (toYMD already handles invalid dates by returning '')
     return parsed;
   };
   const numberParser = (p: any) => {
@@ -745,32 +652,14 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, minWidth: 120 },
 
       { headerName: 'Date Received', field: 'date_received', editable: true, 
-        cellEditor: DateCellEditor,
+        cellEditor: 'agDateStringCellEditor',
         valueFormatter: dateFormatter, 
         valueParser: dateParser,
-        suppressKeyboardEvent: (params: any) => {
-          // Prevent delete/backspace from clearing the cell when it has a value
-          if (params.event.key === 'Delete' || params.event.key === 'Backspace') {
-            if (params.node.data?.date_received) {
-              return true; // suppress the event
-            }
-          }
-          return false;
-        },
         minWidth: 130 },
       { headerName: 'Order Date', field: 'order_date', editable: true, 
-        cellEditor: DateCellEditor,
+        cellEditor: 'agDateStringCellEditor',
         valueFormatter: dateFormatter, 
         valueParser: dateParser,
-        suppressKeyboardEvent: (params: any) => {
-          // Prevent delete/backspace from clearing the cell when it has a value
-          if (params.event.key === 'Delete' || params.event.key === 'Backspace') {
-            if (params.node.data?.order_date) {
-              return true; // suppress the event
-            }
-          }
-          return false;
-        },
         minWidth: 120 },
 
       { headerName: 'Order Number', field: 'order_no', editable: true, minWidth: 130 },
@@ -797,18 +686,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       { headerName: 'Refund Amount', field: 'refund_amount', editable: true, valueFormatter: (p) => typeof p.value === 'number' ? formatCurrency(p.value) : formatCurrency(0), valueParser: numberParser, minWidth: 130 },
 
       { headerName: 'Refund Date', field: 'refund_date', editable: true, 
-        cellEditor: DateCellEditor,
+        cellEditor: 'agDateStringCellEditor',
         valueFormatter: dateFormatter, 
         valueParser: dateParser,
-        suppressKeyboardEvent: (params: any) => {
-          // Prevent delete/backspace from clearing the cell when it has a value
-          if (params.event.key === 'Delete' || params.event.key === 'Backspace') {
-            if (params.node.data?.refund_date) {
-              return true; // suppress the event
-            }
-          }
-          return false;
-        },
         minWidth: 120 },
 
       { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: true, minWidth: 160 },
