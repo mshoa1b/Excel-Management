@@ -101,9 +101,11 @@ export default function StatsPage() {
     doc.setFontSize(20);
     doc.text('Refunds Statement', 20, 20);
     
-    // Date range and platform info
+    // Date range and platform info - format dates as dd-mm-yyyy
     doc.setFontSize(12);
-    doc.text(`Date Range: ${fromDate} to ${toDate}`, 20, 35);
+    const fromDateFormatted = format(new Date(fromDate), 'dd-MM-yyyy');
+    const toDateFormatted = format(new Date(toDate), 'dd-MM-yyyy');
+    doc.text(`Date Range: ${fromDateFormatted} to ${toDateFormatted}`, 20, 35);
     doc.text(`Platform: ${platform === 'all' ? 'All Platforms' : platform}`, 20, 45);
     
     // Sort and process data
@@ -115,10 +117,10 @@ export default function StatsPage() {
       return new Date(a.refund_date).getTime() - new Date(b.refund_date).getTime();
     });
     
-    // Create table manually
+    // Create table manually with wider columns for full order numbers
     let yPosition = 65;
-    const columnWidths = [40, 50, 40, 40];
-    const columnPositions = [20, 60, 110, 150];
+    const columnWidths = [30, 70, 35, 35];
+    const columnPositions = [20, 50, 120, 155];
     
     // Table headers
     doc.setFontSize(10);
@@ -142,14 +144,25 @@ export default function StatsPage() {
       }
       
       const refundDate = format(new Date(row.refund_date), 'dd/MM/yyyy');
-      const orderNumber = (row.order_number || '-').substring(0, 12); // Truncate if too long
+      const orderNumber = row.order_number || '-'; // Show full order number without truncation
       const refundAmount = row.refund_amount ? `$${parseFloat(row.refund_amount).toFixed(2)}` : '$0.00';
       const platform = row.platform || '-';
+      
+      // Use smaller font for order numbers if they're very long
+      const isLongOrderNumber = orderNumber.length > 15;
+      if (isLongOrderNumber) {
+        doc.setFontSize(8);
+      }
       
       doc.text(refundDate, columnPositions[0], yPosition);
       doc.text(orderNumber, columnPositions[1], yPosition);
       doc.text(refundAmount, columnPositions[2], yPosition);
       doc.text(platform, columnPositions[3], yPosition);
+      
+      // Reset font size if it was changed
+      if (isLongOrderNumber) {
+        doc.setFontSize(10);
+      }
       
       yPosition += 8;
     });
@@ -169,8 +182,8 @@ export default function StatsPage() {
     doc.text(`Total Records: ${sortedData.length}`, 20, yPosition);
     doc.text(`Total Refund Amount: $${totalAmount.toFixed(2)}`, 120, yPosition);
     
-    // Save the PDF
-    doc.save(`refunds-statement-${fromDate}-to-${toDate}.pdf`);
+    // Save the PDF with properly formatted dates
+    doc.save(`refunds-statement-${fromDateFormatted}-to-${toDateFormatted}.pdf`);
   };
 
   const getRangeLabel = (range: string) => {
