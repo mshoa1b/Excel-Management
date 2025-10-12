@@ -784,32 +784,26 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         pinned: 'right',
         width: 120,
         cellRenderer: (p: any) => (
-          <div className="flex justify-end gap-1 pr-1">
-            <div className="relative">
-              <AttachmentManager 
-                sheetId={p.data?.id} 
-                onAttachmentChange={() => {
-                  // Refresh attachment count for this row
-                  if (p.data?.id) {
-                    apiClient.getAttachments(p.data.id).then(attachments => {
-                      setAttachmentCounts(prev => ({
-                        ...prev,
-                        [p.data.id]: attachments.length
-                      }));
-                    }).catch(() => {
-                      // Ignore errors for count updates
-                    });
-                  }
-                }}
-              />
-              {attachmentCounts[p.data?.id] > 0 && (
-                <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full h-4 w-4 flex items-center justify-center">
-                  {attachmentCounts[p.data?.id]}
-                </span>
-              )}
-            </div>
+          <div className="flex justify-end gap-1 pr-1 group">
+            <AttachmentManager 
+              sheetId={p.data?.id} 
+              attachmentCount={attachmentCounts[p.data?.id] || 0}
+              onAttachmentChange={() => {
+                // Refresh attachment count for this row
+                if (p.data?.id) {
+                  apiClient.getAttachments(p.data.id).then(attachments => {
+                    setAttachmentCounts(prev => ({
+                      ...prev,
+                      [p.data.id]: attachments.length
+                    }));
+                  }).catch(() => {
+                    // Ignore errors for count updates
+                  });
+                }
+              }}
+            />
             <button
-              className="rounded-md px-2 py-1 text-red-600 hover:bg-red-50"
+              className="rounded-md px-2 py-1 text-white group-hover:text-black hover:bg-gray-100"
               onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
               title="Delete row"
             >

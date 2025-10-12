@@ -19,6 +19,7 @@ interface Attachment {
 interface AttachmentManagerProps {
   sheetId: number;
   onAttachmentChange?: () => void;
+  attachmentCount?: number;
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -33,7 +34,7 @@ const isImageFile = (mimeType: string): boolean => {
   return mimeType.startsWith('image/');
 };
 
-export function AttachmentManager({ sheetId, onAttachmentChange }: AttachmentManagerProps) {
+export function AttachmentManager({ sheetId, onAttachmentChange, attachmentCount }: AttachmentManagerProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -149,19 +150,15 @@ export function AttachmentManager({ sheetId, onAttachmentChange }: AttachmentMan
     <>
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2"
+          <button
+            className="rounded-md px-2 py-1 text-white group-hover:text-black hover:bg-gray-100 flex items-center gap-1"
             title="Manage attachments"
           >
             <Paperclip className="h-4 w-4" />
-            {attachments.length > 0 && (
-              <span className="bg-blue-100 text-blue-800 text-xs px-1.5 py-0.5 rounded-full">
-                {attachments.length}
-              </span>
-            )}
-          </Button>
+            <span className="text-xs">
+              {attachmentCount !== undefined ? attachmentCount : (attachments.length || 0)}
+            </span>
+          </button>
         </DialogTrigger>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
