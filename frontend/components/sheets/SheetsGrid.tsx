@@ -564,18 +564,18 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     const r = event.data;
     if (!r?.id) return;
 
-    // Prevent saving if the change would result in data loss
+    // Debug logging for date changes
     const changedField = event.colDef.field as string | undefined;
     if (changedField && ['date_received', 'order_date', 'refund_date'].includes(changedField)) {
-      // If the new value is invalid and would clear existing data, don't save
-      if (event.newValue === '' && event.oldValue && event.oldValue !== '') {
-        // Restore the old value
-        if (event.node && event.node.data) {
-          (event.node.data as any)[changedField] = event.oldValue;
-          apiRef.current?.redrawRows?.({ rowNodes: [event.node] });
-        }
-        return;
-      }
+      console.log('Date field changed:', {
+        field: changedField,
+        oldValue: event.oldValue,
+        newValue: event.newValue,
+        parsedValue: toYMD(event.newValue)
+      });
+      
+      // Allow the change to proceed - remove the blocking logic
+      // The dateParser will handle the conversion properly
     }
 
     const payload = normalizeForSave(r);
@@ -679,11 +679,27 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   // Formatters and parsers
   const dateFormatter = (p: any) => (p.value ? format(new Date(p.value), 'dd/MM/yyyy') : '');
   const dateParser = (p: any) => {
-    // If newValue is null, undefined, or empty string, preserve the original value
-    if (p.newValue == null || p.newValue === '') {
+    // If newValue is null or undefined, return empty string to clear the date
+    if (p.newValue == null) {
+      return '';
+    }
+    
+    // If newValue is empty string, allow clearing the date
+    if (p.newValue === '') {
+      return '';
+    }
+    
+    // Try to parse the new value
+    const parsed = toYMD(p.newValue);
+    console.log('Date parser:', { input: p.newValue, output: parsed });
+    
+    // If parsing failed, return the old value to prevent corruption
+    if (!parsed || parsed === '') {
+      console.warn('Date parsing failed, keeping old value:', p.oldValue);
       return p.oldValue || '';
     }
-    return toYMD(p.newValue);
+    
+    return parsed;
   };
   const numberParser = (p: any) => {
     const n = parseFloat(p.newValue);
