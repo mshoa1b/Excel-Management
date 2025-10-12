@@ -843,7 +843,7 @@ export default function UsersPage() {
                           API Key
                         </div>
                         <div className="text-sm font-mono text-green-800 bg-white px-3 py-2 rounded border">
-                          {credsMasked.key || '—'}
+                          {credsMasked.key ? '••••••••••••••••' : '—'}
                         </div>
                       </div>
                       <div className="space-y-1">
@@ -851,7 +851,7 @@ export default function UsersPage() {
                           API Secret
                         </div>
                         <div className="text-sm font-mono text-green-800 bg-white px-3 py-2 rounded border">
-                          {credsMasked.secret || '—'}
+                          {credsMasked.secret ? '••••••••••••••••' : '—'}
                         </div>
                       </div>
                     </div>
