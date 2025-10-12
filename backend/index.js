@@ -41,7 +41,17 @@ const corsOptions = {
   credentials: true
 };
 app.use(cors(corsOptions));
-app.use(express.json()); 
+
+// Conditional JSON parsing - skip for multipart form data
+app.use((req, res, next) => {
+  if (req.headers['content-type'] && req.headers['content-type'].startsWith('multipart/form-data')) {
+    // Skip JSON parsing for multipart requests (file uploads)
+    next();
+  } else {
+    // Apply JSON parsing for other requests
+    express.json()(req, res, next);
+  }
+});
 
 // CORS middleware handles preflight requests automatically
 
