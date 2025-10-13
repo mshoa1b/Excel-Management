@@ -30,6 +30,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { apiClient } from '@/lib/api';
 import { format } from 'date-fns';
 import { 
@@ -64,6 +65,7 @@ interface Enquiry {
 
 export default function EnquiriesPage() {
   const { user } = useAuth();
+  const { businessName } = useBusiness();
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const loadingRef = useRef(false);
@@ -86,9 +88,6 @@ export default function EnquiriesPage() {
     description: '',
     status: 'Awaiting Business' // Default status
   });
-
-  // Get business name for status display
-  const businessName = user?.business?.name || 'Business';
 
   // Calculate stats from current enquiries
   const stats = {
@@ -256,6 +255,13 @@ export default function EnquiriesPage() {
     }
   };
 
+  const getDisplayStatus = (status: string) => {
+    if (status === 'Awaiting Business') {
+      return `Awaiting ${businessName || 'Business'}`;
+    }
+    return status;
+  };
+
 
 
   if (loading) {
@@ -281,7 +287,7 @@ export default function EnquiriesPage() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-3xl font-bold text-slate-900">Enquiries</h1>
-              <p className="text-slate-600">Manage communication between Techezm and businesses</p>
+              <p className="text-slate-600">Manage communication between Techezm and {businessName || 'businesses'}</p>
             </div>
             
             <Dialog open={newEnquiryOpen} onOpenChange={setNewEnquiryOpen}>
@@ -330,7 +336,7 @@ export default function EnquiriesPage() {
                         <SelectValue placeholder="Select initial status" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="Awaiting Business">Awaiting {businessName}</SelectItem>
+                        <SelectItem value="Awaiting Business">Awaiting {businessName || 'Business'}</SelectItem>
                         <SelectItem value="Awaiting Techezm">Awaiting Techezm</SelectItem>
                       </SelectContent>
                     </Select>
@@ -453,7 +459,7 @@ export default function EnquiriesPage() {
                       <SelectContent>
                         <SelectItem value="active">Active (Default)</SelectItem>
                         <SelectItem value="all">All Enquiries</SelectItem>
-                        <SelectItem value="awaiting_business">Awaiting Business</SelectItem>
+                        <SelectItem value="awaiting_business">Awaiting {businessName || 'Business'}</SelectItem>
                         <SelectItem value="awaiting_techezm">Awaiting Techezm</SelectItem>
                         <SelectItem value="resolved">Resolved</SelectItem>
                       </SelectContent>
@@ -540,7 +546,7 @@ export default function EnquiriesPage() {
                 </div>
                 <div className="bg-blue-50 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-blue-700">{stats.awaitingBusiness}</div>
-                  <div className="text-sm text-blue-600">Awaiting Business</div>
+                  <div className="text-sm text-blue-600">Awaiting {businessName || 'Business'}</div>
                 </div>
                 <div className="bg-orange-50 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-orange-700">{stats.awaitingTechezm}</div>
@@ -589,7 +595,7 @@ export default function EnquiriesPage() {
                         </TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(enquiry.status)}>
-                            {enquiry.status}
+                            {getDisplayStatus(enquiry.status)}
                           </Badge>
                         </TableCell>
                         <TableCell>{enquiry.created_by_username || 'Unknown'}</TableCell>

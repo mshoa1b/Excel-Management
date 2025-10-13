@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { apiClient } from '@/lib/api';
 import type { Stats } from '@/types';
 import { FileSpreadsheet, DollarSign, TrendingUp, ArrowRight } from 'lucide-react';
@@ -17,6 +18,7 @@ import { FileSpreadsheet, DollarSign, TrendingUp, ArrowRight } from 'lucide-reac
 
 export default function BusinessAdminDashboard() {
   const { user, loading: authLoading } = useAuth();
+  const { businessName } = useBusiness();
   const { formatCurrency } = useCurrency(user?.business_id || '');
   const [stats, setStats] = useState<Stats | null>(null);
   const [dataLoading, setDataLoading] = useState(true);
@@ -72,7 +74,7 @@ export default function BusinessAdminDashboard() {
         <div className="space-y-8">
           <div>
             <h1 className="text-3xl font-bold text-slate-800 mb-2">
-              {user?.business?.name ? `${user.business.name} Dashboard` : 'Business Admin Dashboard'}
+              {businessName ? `${businessName} Dashboard` : 'Business Admin Dashboard'}
             </h1>
             <p className="text-slate-600">Manage your business operations and view analytics</p>
           </div>
