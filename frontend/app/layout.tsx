@@ -1,5 +1,6 @@
 import './globals.css';
 import type { Metadata } from 'next';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 
 export const metadata: Metadata = {
   title: 'Techezm RMA',
@@ -16,7 +17,11 @@ export default function RootLayout({
       <head>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
       </head>
-      <body className="font-sans">{children}</body>
+      <body className="font-sans">
+        <NotificationProvider>
+          {children}
+        </NotificationProvider>
+      </body>
     </html>
   );
 }

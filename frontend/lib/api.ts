@@ -21,10 +21,10 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 
 class ApiClient {
-  private getAuthHeaders() {
+  private getAuthHeaders(includeContentType = true) {
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     return {
-      "Content-Type": "application/json",
+      ...(includeContentType ? { "Content-Type": "application/json" } : {}),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
   }
@@ -41,9 +41,13 @@ class ApiClient {
 
   async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
+    
+    // Don't set Content-Type for FormData - let browser set it automatically
+    const isFormData = options.body instanceof FormData;
+    
     const res = await fetch(url, {
       ...options,
-      headers: { ...this.getAuthHeaders(), ...(options.headers || {}) },
+      headers: { ...this.getAuthHeaders(!isFormData), ...(options.headers || {}) },
     });
 
     if (!res.ok) {

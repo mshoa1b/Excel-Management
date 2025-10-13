@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Dialog,
   DialogContent,
@@ -28,19 +30,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { apiClient } from '@/lib/api';
 import { format } from 'date-fns';
 import { 
   MessageSquare, 
   Plus, 
   Eye, 
-  Calendar,
   Package,
   Building2,
   User,
   FileText,
   Upload,
-  X
+  X,
+  Search,
+  CalendarDays,
+  Filter
 } from 'lucide-react';
 
 interface Enquiry {
@@ -60,26 +65,83 @@ interface Enquiry {
 
 export default function EnquiriesPage() {
   const { user } = useAuth();
+  const { checkForNewNotifications } = useNotifications();
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [loading, setLoading] = useState(true);
   const [newEnquiryOpen, setNewEnquiryOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   
+  // Search and filter state
+  const [searchOrderNumber, setSearchOrderNumber] = useState('');
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [platformFilter, setPlatformFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('active'); // Default to non-resolved + recent resolved
+  const [dateFromOpen, setDateFromOpen] = useState(false);
+  const [dateToOpen, setDateToOpen] = useState(false);
+  
   // New enquiry form state
   const [formData, setFormData] = useState({
     order_number: '',
     platform: '',
-    description: ''
+    description: '',
+    status: 'Awaiting Business' // Default status
   });
+
+  // Get business name for status display
+  const businessName = user?.business?.name || 'Business';
+
+  // Calculate stats from current enquiries
+  const stats = {
+    resolved: enquiries.filter(e => e.status === 'Resolved').length,
+    awaitingBusiness: enquiries.filter(e => e.status === 'Awaiting Business').length,
+    awaitingTechezm: enquiries.filter(e => e.status === 'Awaiting Techezm').length,
+    total: enquiries.length
+  };
 
   useEffect(() => {
     loadEnquiries();
   }, []);
 
+  // Trigger search when filters change
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      loadEnquiries();
+    }, 300); // Debounce search
+    return () => clearTimeout(timeoutId);
+  }, [searchOrderNumber, dateFrom, dateTo, platformFilter, statusFilter]);
+
   const loadEnquiries = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.request('/enquiries');
+      
+      // Build query parameters
+      const params = new URLSearchParams();
+      
+      if (searchOrderNumber.trim()) {
+        params.append('order_number', searchOrderNumber.trim());
+      }
+      
+      if (dateFrom) {
+        params.append('date_from', format(dateFrom, 'yyyy-MM-dd'));
+      }
+      
+      if (dateTo) {
+        params.append('date_to', format(dateTo, 'yyyy-MM-dd'));
+      }
+      
+      if (platformFilter && platformFilter !== 'all') {
+        params.append('platform', platformFilter);
+      }
+      
+      if (statusFilter && statusFilter !== 'all') {
+        params.append('status_filter', statusFilter);
+      }
+      
+      const queryString = params.toString();
+      const endpoint = queryString ? `/enquiries?${queryString}` : '/enquiries';
+      
+      const data = await apiClient.request(endpoint);
       setEnquiries(data);
     } catch (error) {
       console.error('Failed to load enquiries:', error);
@@ -90,7 +152,7 @@ export default function EnquiriesPage() {
 
   const handleSubmit = async () => {
     try {
-      if (!formData.order_number || !formData.platform || !formData.description) {
+      if (!formData.order_number || !formData.platform || !formData.description || !formData.status) {
         alert('Please fill in all required fields');
         return;
       }
@@ -99,6 +161,7 @@ export default function EnquiriesPage() {
         order_number: formData.order_number,
         platform: formData.platform,
         description: formData.description,
+        status: formData.status,
         business_id: user?.business_id
       };
 
@@ -112,25 +175,37 @@ export default function EnquiriesPage() {
 
       // Handle file uploads if any
       if (selectedFiles.length > 0) {
+        console.log('Uploading files:', selectedFiles.length, selectedFiles);
         const formDataFiles = new FormData();
         selectedFiles.forEach(file => {
+          console.log('Appending file:', file.name, file.size, file.type);
           formDataFiles.append('files', file);
         });
         formDataFiles.append('enquiry_id', newEnquiry.id.toString());
 
-        await apiClient.request(`/enquiries/${newEnquiry.id}/attachments`, {
-          method: 'POST',
-          body: formDataFiles
-        });
+        try {
+          await apiClient.request(`/enquiries/${newEnquiry.id}/attachments`, {
+            method: 'POST',
+            body: formDataFiles
+          });
+          console.log('Files uploaded successfully');
+        } catch (fileError) {
+          console.error('File upload error:', fileError);
+          // Don't fail the entire enquiry creation if just file upload fails
+          alert('Enquiry created successfully, but file upload failed. You can try uploading files again from the enquiry details page.');
+        }
+      } else {
+        console.log('No files to upload');
       }
 
       // Reset form
-      setFormData({ order_number: '', platform: '', description: '' });
+      setFormData({ order_number: '', platform: '', description: '', status: 'Awaiting Business' });
       setSelectedFiles([]);
       setNewEnquiryOpen(false);
       
-      // Reload enquiries
+      // Reload enquiries and refresh notifications
       loadEnquiries();
+      checkForNewNotifications();
     } catch (error) {
       console.error('Failed to create enquiry:', error);
       alert('Failed to create enquiry. Please try again.');
@@ -156,6 +231,14 @@ export default function EnquiriesPage() {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
+  const clearFilters = () => {
+    setSearchOrderNumber('');
+    setDateFrom(undefined);
+    setDateTo(undefined);
+    setPlatformFilter('all');
+    setStatusFilter('active');
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Awaiting Business':
@@ -169,20 +252,11 @@ export default function EnquiriesPage() {
     }
   };
 
-  const getDirectionLabel = (enquiry: Enquiry) => {
-    if (!user) return '';
-    
-    // If current user is Superadmin (Techezm) or user created it from business side
-    if (user.role.name === 'Superadmin') {
-      return enquiry.created_by === user.id ? 'To Business' : 'From Business';
-    } else {
-      return enquiry.created_by === user.id ? 'To Techezm' : 'From Techezm';
-    }
-  };
+
 
   if (loading) {
     return (
-      <ProtectedRoute requiredRole={['Superadmin', 'Business Admin', 'User']}>
+      <ProtectedRoute requiredRole="User">
         <DashboardLayout>
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -196,7 +270,7 @@ export default function EnquiriesPage() {
   }
 
   return (
-    <ProtectedRoute requiredRole={['Superadmin', 'Business Admin', 'User']}>
+    <ProtectedRoute requiredRole="User">
       <DashboardLayout>
         <div className="space-y-6">
           {/* Header */}
@@ -241,6 +315,19 @@ export default function EnquiriesPage() {
                       <SelectContent>
                         <SelectItem value="amazon">Amazon</SelectItem>
                         <SelectItem value="backmarket">Backmarket</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="status">Initial Status</Label>
+                    <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select initial status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Awaiting Business">Awaiting {businessName}</SelectItem>
+                        <SelectItem value="Awaiting Techezm">Awaiting Techezm</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -318,6 +405,144 @@ export default function EnquiriesPage() {
                 <MessageSquare className="h-5 w-5" />
                 <span>All Enquiries</span>
               </CardTitle>
+              
+              {/* Search and Filters */}
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Order Number Search */}
+                  <div className="space-y-2">
+                    <Label htmlFor="search">Order Number</Label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        id="search"
+                        placeholder="Search by order number..."
+                        value={searchOrderNumber}
+                        onChange={(e) => setSearchOrderNumber(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Platform Filter */}
+                  <div className="space-y-2">
+                    <Label>Platform</Label>
+                    <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Platforms</SelectItem>
+                        <SelectItem value="amazon">Amazon</SelectItem>
+                        <SelectItem value="backmarket">Backmarket</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Status Filter */}
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">Active (Default)</SelectItem>
+                        <SelectItem value="all">All Enquiries</SelectItem>
+                        <SelectItem value="awaiting_business">Awaiting Business</SelectItem>
+                        <SelectItem value="awaiting_techezm">Awaiting Techezm</SelectItem>
+                        <SelectItem value="resolved">Resolved</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Clear Filters Button */}
+                  <div className="space-y-2">
+                    <Label className="invisible">Clear</Label>
+                    <Button variant="outline" onClick={clearFilters} className="w-full">
+                      <X className="h-4 w-4 mr-2" />
+                      Clear Filters
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Date Range Filters */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Date From */}
+                  <div className="space-y-2">
+                    <Label>Date From</Label>
+                    <Popover open={dateFromOpen} onOpenChange={setDateFromOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          
+                          {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'Select start date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dateFrom}
+                          onSelect={(date) => {
+                            setDateFrom(date);
+                            setDateFromOpen(false);
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  {/* Date To */}
+                  <div className="space-y-2">
+                    <Label>Date To</Label>
+                    <Popover open={dateToOpen} onOpenChange={setDateToOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                        >
+                          
+                          {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'Select end date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dateTo}
+                          onSelect={(date) => {
+                            setDateTo(date);
+                            setDateToOpen(false);
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Stats Section */}
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-slate-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-slate-700">{stats.total}</div>
+                  <div className="text-sm text-slate-500">Total Enquiries</div>
+                </div>
+                <div className="bg-green-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-green-700">{stats.resolved}</div>
+                  <div className="text-sm text-green-600">Resolved</div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-blue-700">{stats.awaitingBusiness}</div>
+                  <div className="text-sm text-blue-600">Awaiting Business</div>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-4 text-center">
+                  <div className="text-2xl font-bold text-orange-700">{stats.awaitingTechezm}</div>
+                  <div className="text-sm text-orange-600">Awaiting Techezm</div>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               {enquiries.length === 0 ? (
@@ -333,7 +558,6 @@ export default function EnquiriesPage() {
                       <TableHead>Date</TableHead>
                       <TableHead>Order Number</TableHead>
                       <TableHead>Platform</TableHead>
-                      <TableHead>Direction</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead>Created By</TableHead>
                       <TableHead>Actions</TableHead>
@@ -344,7 +568,7 @@ export default function EnquiriesPage() {
                       <TableRow key={enquiry.id}>
                         <TableCell>
                           <div className="flex items-center space-x-2">
-                            <Calendar className="h-4 w-4 text-slate-400" />
+                            
                             <span>{format(new Date(enquiry.enquiry_date), 'dd/MM/yyyy')}</span>
                           </div>
                         </TableCell>
@@ -358,16 +582,6 @@ export default function EnquiriesPage() {
                           <Badge variant="outline" className="capitalize">
                             {enquiry.platform}
                           </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center space-x-2">
-                            {getDirectionLabel(enquiry).includes('To') ? (
-                              <Building2 className="h-4 w-4 text-blue-500" />
-                            ) : (
-                              <User className="h-4 w-4 text-green-500" />
-                            )}
-                            <span className="text-sm">{getDirectionLabel(enquiry)}</span>
-                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge className={getStatusColor(enquiry.status)}>
