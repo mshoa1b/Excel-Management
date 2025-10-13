@@ -15,7 +15,8 @@ const statsRoutes = require("./routes/stats");
 const bmOrdersRoutes = require("./routes/bmOrders");
 const backmarketCredsRoutes = require("./routes/backmarket");
 const attachmentRoutes = require("./routes/attachments");
-const enquiriesRoutes = require("./routes/enquiries"); 
+const enquiriesRoutes = require("./routes/enquiries");
+const { router: notificationsRoutes } = require("./routes/notifications"); 
 
 const app = express();
 
@@ -46,7 +47,13 @@ app.use(cors(corsOptions));
 // Conditional JSON parsing - skip for attachment upload routes
 app.use((req, res, next) => {
   // Skip JSON parsing for attachment upload routes
-  if (req.url.includes('/api/attachments/upload')) {
+  const isAttachmentUpload = req.url.includes('/api/attachments/upload') || 
+                           req.url.includes('/attachments') ||
+                           (req.url.includes('/api/enquiries/') && req.url.includes('/attachments'));
+  
+  console.log('Request URL:', req.url, 'Skip JSON parsing:', isAttachmentUpload);
+  
+  if (isAttachmentUpload) {
     next();
   } else {
     // Apply JSON parsing for other routes
@@ -108,6 +115,7 @@ app.use("/api/stats", statsRoutes);
 app.use("/api/bmOrders", bmOrdersRoutes);
 app.use("/api/attachments", attachmentRoutes);
 app.use("/api/enquiries", enquiriesRoutes);
+app.use("/api/notifications", notificationsRoutes);
 
 app.use("/api", backmarketCredsRoutes);
 

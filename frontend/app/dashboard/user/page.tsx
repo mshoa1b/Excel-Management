@@ -127,15 +127,12 @@ export default function UserDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-slate-600 text-sm">
-                  Access and manage return sheets, view order details, and process refunds.
+                  Access and manage returns, view order details, and process refunds.
                 </p>
                 <div className="flex justify-between items-center">
-                  <span className="text-xs text-slate-500">
-                    Business ID: {bizId}
-                  </span>
                   <Link href={`/sheets/${bizId}`}>
                     <Button className="group">
-                      View Sheets
+                      View Returns
                       <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </Button>
                   </Link>

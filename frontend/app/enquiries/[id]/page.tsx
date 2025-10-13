@@ -23,7 +23,8 @@ import {
   MessageSquare,
   Clock,
   Paperclip,
-  Download
+  Download,
+  X
 } from 'lucide-react';
 
 interface EnquiryMessage {
@@ -61,6 +62,7 @@ export default function EnquiryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [messageFiles, setMessageFiles] = useState<File[]>([]);
 
   useEffect(() => {
     if (enquiryId) {
@@ -83,19 +85,36 @@ export default function EnquiryDetailPage() {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !enquiry) return;
+    if ((!newMessage.trim() && messageFiles.length === 0) || !enquiry) return;
 
     try {
       setSending(true);
-      await apiClient.request(`/enquiries/${enquiry.id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ message: newMessage.trim() })
-      });
+      
+      // If there are files, send as FormData
+      if (messageFiles.length > 0) {
+        const formData = new FormData();
+        formData.append('message', newMessage.trim() || 'Attached files');
+        messageFiles.forEach(file => {
+          formData.append('files', file);
+        });
+        
+        await apiClient.request(`/enquiries/${enquiry.id}/messages`, {
+          method: 'POST',
+          body: formData
+        });
+      } else {
+        // Text-only message
+        await apiClient.request(`/enquiries/${enquiry.id}/messages`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message: newMessage.trim() })
+        });
+      }
 
       setNewMessage('');
+      setMessageFiles([]);
       // Reload enquiry to get updated messages
       loadEnquiry();
     } catch (error) {
@@ -126,6 +145,80 @@ export default function EnquiryDetailPage() {
     }
   };
 
+  const handleDownloadAttachment = async (attachment: any, messageId: number) => {
+    try {
+      if (!attachment.filePath) {
+        // Fallback for old attachments that only have metadata
+        const fileInfo = `File: ${attachment.originalName}\nSize: ${attachment.size} bytes\nType: ${attachment.mimetype}\nUploaded: ${new Date(attachment.uploadedAt).toLocaleString()}\n\nNote: This is an old attachment where only metadata was stored.`;
+        
+        const blob = new Blob([fileInfo], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${attachment.originalName}_metadata.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        return;
+      }
+
+      // Download actual file using the new endpoint
+      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/enquiries/${params.id}/attachments/${attachment.filePath}/download`;
+      
+      // Get auth token
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(downloadUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.originalName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download attachment. Please try again.');
+    }
+  };
+
+  const isMyMessage = (message: EnquiryMessage) => {
+    return Number(user?.id) === message.created_by;
+  };
+
+  const handleMessageFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const allowedTypes = ['image/', 'application/pdf', 'text/plain'];
+    
+    const validFiles = files.filter(file => 
+      allowedTypes.some(type => file.type.startsWith(type))
+    );
+    
+    if (validFiles.length !== files.length) {
+      alert('Only images, PDF, and text files are allowed');
+    }
+    
+    setMessageFiles(prev => [...prev, ...validFiles]);
+  };
+
+  const removeMessageFile = (index: number) => {
+    setMessageFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Awaiting Business':
@@ -139,13 +232,9 @@ export default function EnquiryDetailPage() {
     }
   };
 
-  const isMyMessage = (message: EnquiryMessage) => {
-    return user?.id === message.created_by;
-  };
-
   if (loading) {
     return (
-      <ProtectedRoute requiredRole={['Superadmin', 'Business Admin', 'User']}>
+      <ProtectedRoute requiredRole="User">
         <DashboardLayout>
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -160,7 +249,7 @@ export default function EnquiryDetailPage() {
 
   if (!enquiry) {
     return (
-      <ProtectedRoute requiredRole={['Superadmin', 'Business Admin', 'User']}>
+      <ProtectedRoute requiredRole="User">
         <DashboardLayout>
           <div className="text-center py-12">
             <p className="text-slate-600">Enquiry not found</p>
@@ -174,7 +263,7 @@ export default function EnquiryDetailPage() {
   }
 
   return (
-    <ProtectedRoute requiredRole={['Superadmin', 'Business Admin', 'User']}>
+    <ProtectedRoute requiredRole="User">
       <DashboardLayout>
         <div className="space-y-6">
           {/* Header */}
@@ -335,7 +424,10 @@ export default function EnquiryDetailPage() {
                               >
                                 <Paperclip className="h-3 w-3" />
                                 <span className="truncate">{attachment.originalName}</span>
-                                <Download className="h-3 w-3 cursor-pointer" />
+                                <Download 
+                                  className="h-3 w-3 cursor-pointer hover:text-blue-200" 
+                                  onClick={() => handleDownloadAttachment(attachment, message.id)}
+                                />
                               </div>
                             ))}
                           </div>
@@ -348,29 +440,82 @@ export default function EnquiryDetailPage() {
                 {/* Message Input */}
                 {enquiry.status !== 'Resolved' && (
                   <div className="p-4 border-t">
+                    {/* File Attachments Preview */}
+                    {messageFiles.length > 0 && (
+                      <div className="mb-3 space-y-2">
+                        <p className="text-sm font-medium text-slate-700">Attachments:</p>
+                        <div className="space-y-1">
+                          {messageFiles.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between bg-slate-50 p-2 rounded text-sm">
+                              <div className="flex items-center space-x-2">
+                                <Paperclip className="h-4 w-4 text-slate-400" />
+                                <span className="truncate">{file.name}</span>
+                                <span className="text-xs text-slate-500">({(file.size / 1024).toFixed(1)} KB)</span>
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeMessageFile(index)}
+                                className="h-6 w-6 p-0 hover:bg-slate-200"
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="flex space-x-2">
-                      <Textarea
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type your message..."
-                        className="flex-1 min-h-[60px] resize-none"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSendMessage();
-                          }
-                        }}
-                      />
-                      <Button 
-                        onClick={handleSendMessage}
-                        disabled={!newMessage.trim() || sending}
-                        className="px-4"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
+                      <div className="flex-1">
+                        <Textarea
+                          value={newMessage}
+                          onChange={(e) => setNewMessage(e.target.value)}
+                          placeholder="Type your message..."
+                          className="min-h-[60px] resize-none"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleSendMessage();
+                            }
+                          }}
+                        />
+                      </div>
+                      
+                      <div className="flex flex-col space-y-2">
+                        {/* File Upload Button */}
+                        <div>
+                          <input
+                            type="file"
+                            multiple
+                            onChange={handleMessageFileSelect}
+                            className="hidden"
+                            id="message-file-upload"
+                            accept="image/*,.pdf,.txt"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById('message-file-upload')?.click()}
+                            className="px-3"
+                            type="button"
+                          >
+                            <Paperclip className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        
+                        {/* Send Button */}
+                        <Button 
+                          onClick={handleSendMessage}
+                          disabled={(!newMessage.trim() && messageFiles.length === 0) || sending}
+                          className="px-4"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                     <p className="text-xs text-slate-500 mt-1">
-                      Press Enter to send, Shift+Enter for new line
+                      Press Enter to send, Shift+Enter for new line. Click 📎 to attach files.
                     </p>
                   </div>
                 )}
