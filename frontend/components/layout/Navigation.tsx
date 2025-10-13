@@ -17,7 +17,8 @@ import {
   LogOut, 
   Menu, 
   Settings,
-  Settings2
+  Settings2,
+  MessageSquare
 } from 'lucide-react';
 
 export default function Navigation() {
@@ -45,6 +46,7 @@ export default function Navigation() {
       case 'Superadmin':
         return [
           ...baseItems,
+          { href: '/enquiries', label: 'Enquiries', icon: MessageSquare },
           { href: '/manage', label: 'Manage', icon: Settings2 },
         ];
       case 'Business Admin':
@@ -52,12 +54,14 @@ export default function Navigation() {
           ...baseItems,
           { href: `/sheets/${user.business_id}`, label: 'Returns', icon: FileSpreadsheet },
           { href: `/stats/${user.business_id}`, label: 'Analytics', icon: BarChart3 },
+          { href: '/enquiries', label: 'Enquiries', icon: MessageSquare },
           { href: '/manage', label: 'Manage', icon: Settings2 }
         ];
       case 'User':
         return [
           ...baseItems,
           { href: `/sheets/${user.business_id}`, label: 'My Sheets', icon: FileSpreadsheet },
+          { href: '/enquiries', label: 'Enquiries', icon: MessageSquare },
         ];
       default:
         return baseItems;

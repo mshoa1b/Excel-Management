@@ -14,7 +14,8 @@ const sheetsRoutes = require("./routes/sheets");
 const statsRoutes = require("./routes/stats");
 const bmOrdersRoutes = require("./routes/bmOrders");
 const backmarketCredsRoutes = require("./routes/backmarket");
-const attachmentRoutes = require("./routes/attachments"); 
+const attachmentRoutes = require("./routes/attachments");
+const enquiriesRoutes = require("./routes/enquiries"); 
 
 const app = express();
 
@@ -106,6 +107,7 @@ app.use("/api/sheets", sheetsRoutes);
 app.use("/api/stats", statsRoutes);
 app.use("/api/bmOrders", bmOrdersRoutes);
 app.use("/api/attachments", attachmentRoutes);
+app.use("/api/enquiries", enquiriesRoutes);
 
 app.use("/api", backmarketCredsRoutes);
 

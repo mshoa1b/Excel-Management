@@ -84,8 +84,39 @@ CREATE TABLE sheets (
 CREATE INDEX idx_sheets_business_id ON sheets(business_id);
 CREATE INDEX idx_sheets_date_received ON sheets(date_received);
 -- ===========================================
+-- ENQUIRIES TABLE
+-- ===========================================
+CREATE TABLE enquiries (
+    id SERIAL PRIMARY KEY,
+    status VARCHAR(50) NOT NULL DEFAULT 'Awaiting Business', -- 'Awaiting Business', 'Awaiting Techezm', 'Resolved'
+    enquiry_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    order_number VARCHAR(255),
+    platform VARCHAR(50), -- 'amazon', 'backmarket'
+    description TEXT CHECK (char_length(description) <= 2000),
+    business_id INT NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    created_by INT NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ===========================================
+-- ENQUIRY MESSAGES TABLE (Conversation Trail)
+-- ===========================================
+CREATE TABLE enquiry_messages (
+    id SERIAL PRIMARY KEY,
+    enquiry_id INT NOT NULL REFERENCES enquiries(id) ON DELETE CASCADE,
+    message TEXT NOT NULL,
+    attachments JSON, -- Store array of file paths/names
+    created_by INT NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ===========================================
 -- OPTIONAL: Add indexes for performance
 -- ===========================================
 CREATE INDEX idx_sheets_business_id ON sheets(business_id);
 CREATE INDEX idx_sheets_date ON sheets(date);
 CREATE INDEX idx_users_business_id ON users(business_id);
+CREATE INDEX idx_enquiries_business_id ON enquiries(business_id);
+CREATE INDEX idx_enquiries_status ON enquiries(status);
+CREATE INDEX idx_enquiry_messages_enquiry_id ON enquiry_messages(enquiry_id);
