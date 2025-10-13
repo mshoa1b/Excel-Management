@@ -147,7 +147,7 @@ export default function EnquiryDetailPage() {
 
   const handleDownloadAttachment = async (attachment: any, messageId: number) => {
     try {
-      if (!attachment.filePath) {
+      if (!attachment.filename && !attachment.filePath) {
         // Fallback for old attachments that only have metadata
         const fileInfo = `File: ${attachment.originalName}\nSize: ${attachment.size} bytes\nType: ${attachment.mimetype}\nUploaded: ${new Date(attachment.uploadedAt).toLocaleString()}\n\nNote: This is an old attachment where only metadata was stored.`;
         
@@ -164,7 +164,9 @@ export default function EnquiryDetailPage() {
       }
 
       // Download actual file using the new endpoint
-      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/enquiries/${params.id}/attachments/${attachment.filePath}/download`;
+      // Use filename (new format) or filePath (legacy format) for the download URL
+      const fileIdentifier = attachment.filename || attachment.filePath;
+      const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/enquiries/${params.id}/attachments/${fileIdentifier}/download`;
       
       // Get auth token
       const token = localStorage.getItem('token');

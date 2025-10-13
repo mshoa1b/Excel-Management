@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare } from 'lucide-react';
 import { AttachmentManager } from './AttachmentManager';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
@@ -224,6 +224,81 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     amazon: 0, backmarket: 0, total: 0
   });
   const [attachmentCounts, setAttachmentCounts] = useState<{ [sheetId: number]: number }>({});
+  const [enquiryCounts, setEnquiryCounts] = useState<{ [orderNumber: string]: number }>({});
+
+  // Enquiry handling functions
+  const checkExistingEnquiry = async (orderNumber: string) => {
+    try {
+      const enquiries = await apiClient.request(`/enquiries?order_number=${encodeURIComponent(orderNumber)}`);
+      // Find exact match (the backend does partial match, so we filter here)
+      return enquiries.find((e: any) => e.order_number === orderNumber) || null;
+    } catch (error) {
+      console.error('Error checking existing enquiry:', error);
+      return null;
+    }
+  };
+
+  const handleEnquiryAction = async (orderNumber: string, platform: string) => {
+    try {
+      const existingEnquiry = await checkExistingEnquiry(orderNumber);
+      
+      if (existingEnquiry) {
+        // Open existing enquiry in new tab
+        window.open(`/enquiries/${existingEnquiry.id}`, '_blank');
+      } else {
+        // Create new enquiry in new tab with pre-filled data
+        const createUrl = `/enquiries/create?order_number=${encodeURIComponent(orderNumber)}&platform=${platform}`;
+        window.open(createUrl, '_blank');
+      }
+    } catch (error) {
+      console.error('Error handling enquiry action:', error);
+      alert('Failed to process enquiry action. Please try again.');
+    }
+  };
+
+  // Add a ref to track if enquiry counts are currently loading
+  const isLoadingEnquiryCounts = useRef(false);
+
+  // Load enquiry counts for visible order numbers (bulk request)
+  const loadEnquiryCounts = useCallback(async (sheets: SheetRecord[]) => {
+    // Prevent multiple concurrent calls
+    if (isLoadingEnquiryCounts.current) {
+      return;
+    }
+    
+    isLoadingEnquiryCounts.current = true;
+    
+    try {
+      const orderNumbers = Array.from(new Set(sheets.map(sheet => sheet.order_no).filter(Boolean)));
+      
+      if (orderNumbers.length === 0) {
+        setEnquiryCounts({});
+        return;
+      }
+
+      // Use the new bulk counts endpoint
+      const counts = await apiClient.request('/enquiries/bulk-counts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ order_numbers: orderNumbers })
+      });
+      
+      setEnquiryCounts(counts);
+    } catch (error) {
+      console.error('Error loading enquiry counts:', error);
+      // Set all counts to 0 on error
+      const orderNumbers = Array.from(new Set(sheets.map(sheet => sheet.order_no).filter(Boolean)));
+      const counts: { [orderNumber: string]: number } = {};
+      orderNumbers.forEach(orderNumber => {
+        counts[orderNumber] = 0;
+      });
+      setEnquiryCounts(counts);
+    } finally {
+      isLoadingEnquiryCounts.current = false;
+    }
+  }, []);
 
   // Smart search and platform filtering
   useEffect(() => {
@@ -390,12 +465,15 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     
     // Load attachment counts
     loadAttachmentCounts(formatted);
+    
+    // Load enquiry counts
+    loadEnquiryCounts(formatted);
 
     setTimeout(() => {
       autoSizeNonMultiline();
       reflowAutoHeight();
     }, 0);
-  }, [businessId, autoSizeNonMultiline, reflowAutoHeight, recomputeTodayTotals, loadAttachmentCounts]);
+  }, [businessId, autoSizeNonMultiline, reflowAutoHeight, recomputeTodayTotals]);
 
   useEffect(() => { 
     loadStaffOptions();
@@ -679,39 +757,55 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       {
         headerName: 'Actions',
         pinned: 'right',
-        width: 120,
-        cellRenderer: (p: any) => (
-          <div className="flex justify-end gap-1 pr-1">
-            <AttachmentManager 
-              sheetId={p.data?.id} 
-              attachmentCount={attachmentCounts[p.data?.id] || 0}
-              returnId={buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0)}
-              onAttachmentChange={() => {
-                // Refresh attachment count for this row
-                if (p.data?.id) {
-                  apiClient.getAttachments(p.data.id).then(attachments => {
-                    setAttachmentCounts(prev => ({
-                      ...prev,
-                      [p.data.id]: attachments.length
-                    }));
-                  }).catch(() => {
-                    // Ignore errors for count updates
-                  });
-                }
-              }}
-            />
-            <button
-              className="rounded-md px-2 py-1 text-white group-hover:text-black hover:bg-gray-100"
-              onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
-              title="Delete row"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
-          </div>
-        ),
+        width: 160,
+        cellRenderer: (p: any) => {
+          const orderNumber = p.data?.order_no;
+          const platform = computePlatform(p.data);
+          const hasEnquiry = enquiryCounts[orderNumber] > 0;
+          
+          return (
+            <div className="flex justify-end gap-1 pr-1">
+              <AttachmentManager 
+                sheetId={p.data?.id} 
+                attachmentCount={attachmentCounts[p.data?.id] || 0}
+                returnId={buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0)}
+                onAttachmentChange={() => {
+                  // Refresh attachment count for this row
+                  if (p.data?.id) {
+                    apiClient.getAttachments(p.data.id).then(attachments => {
+                      setAttachmentCounts(prev => ({
+                        ...prev,
+                        [p.data.id]: attachments.length
+                      }));
+                    }).catch(() => {
+                      // Ignore errors for count updates
+                    });
+                  }
+                }}
+              />
+              <button
+                className={`rounded-md px-2 py-1 text-white group-hover:text-black hover:bg-gray-100 ${
+                  hasEnquiry ? 'bg-blue-500' : 'bg-gray-400'
+                }`}
+                onClick={() => orderNumber && handleEnquiryAction(orderNumber, platform)}
+                title={hasEnquiry ? 'View existing enquiry' : 'Create new enquiry'}
+                disabled={!orderNumber}
+              >
+                <MessageSquare className="h-4 w-4" />
+              </button>
+              <button
+                className="rounded-md px-2 py-1 text-white group-hover:text-black hover:bg-gray-100"
+                onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
+                title="Delete row"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          );
+        },
       },
     ],
-    [businessId, refresh, staffOptions, formatCurrency, attachmentCounts]
+    [businessId, refresh, staffOptions, formatCurrency, attachmentCounts, enquiryCounts]
   );
 
   // Grid events

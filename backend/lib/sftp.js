@@ -17,12 +17,29 @@ class SFTPManager {
   async connect() {
     if (this.isConnected) return;
     try {
-      await this.sftp.connect(this.config);
+      // Add timeout and more detailed config
+      const configWithTimeout = {
+        ...this.config,
+        readyTimeout: 10000,
+        keepaliveInterval: 5000,
+        debug: console.log
+      };
+      
+      console.log('Attempting SFTP connection to:', this.config.host);
+      console.log('Username:', this.config.username);
+      
+      await this.sftp.connect(configWithTimeout);
       this.isConnected = true;
       console.log('SFTP connected successfully');
     } catch (error) {
       console.error('SFTP connection failed:', error);
-      throw new Error('Failed to connect to SFTP server');
+      console.error('Config used:', { 
+        host: this.config.host, 
+        port: this.config.port, 
+        username: this.config.username,
+        passwordLength: this.config.password?.length 
+      });
+      throw new Error(`Failed to connect to SFTP server: ${error.message}`);
     }
   }
 
@@ -45,22 +62,47 @@ class SFTPManager {
     }
   }
 
+  // Helper function to create SFTP-compatible paths (always forward slashes)
+  sftpPath(...segments) {
+    // Filter out empty or undefined segments
+    const validSegments = segments.filter(segment => segment && typeof segment === 'string' && segment.trim() !== '');
+    if (validSegments.length === 0) {
+      throw new Error('No valid path segments provided');
+    }
+    const path = validSegments.join('/').replace(/\/+/g, '/');
+    console.log('Generated SFTP path:', path, 'from segments:', segments);
+    return path;
+  }
+
   async uploadFile(buffer, businessId, sheetId, filename) {
-    console.log('SFTP uploadFile called with:', { businessId, sheetId, filename, bufferSize: buffer.length });
+    console.log('SFTP uploadFile called with:', { businessId, sheetId, filename, bufferSize: buffer?.length });
+    
+    // Validate input parameters
+    if (!buffer) throw new Error('Buffer is required');
+    if (!businessId) throw new Error('Business ID is required');
+    if (!sheetId) throw new Error('Sheet ID is required');
+    if (!filename) throw new Error('Filename is required');
     
     try {
       await this.connect();
       console.log('SFTP connection established');
       
       // Create directory structure: /uploads/attachments/business_123/sheet_456/
-      const businessDir = path.join(this.basePath, `business_${businessId}`);
-      const sheetDir = path.join(businessDir, `sheet_${sheetId}`);
+      console.log('Base path:', this.basePath);
+      const businessDir = this.sftpPath(this.basePath, `business_${businessId}`);
+      const sheetDir = this.sftpPath(businessDir, `sheet_${sheetId}`);
       
-      console.log('Creating directories:', { businessDir, sheetDir });
+      console.log('Creating directories:', { 
+        basePath: this.basePath,
+        businessDir, 
+        sheetDir,
+        businessId,
+        sheetId 
+      });
       await this.ensureDirectory(businessDir);
       await this.ensureDirectory(sheetDir);
       
-      const filePath = path.join(sheetDir, filename);
+      const filePath = this.sftpPath(sheetDir, filename);
       console.log('Final file path:', filePath);
       
       // Upload file

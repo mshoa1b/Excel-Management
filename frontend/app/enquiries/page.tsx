@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useAuth } from '@/hooks/useAuth';
-import { useNotifications } from '@/contexts/NotificationContext';
 import { apiClient } from '@/lib/api';
 import { format } from 'date-fns';
 import { 
@@ -65,9 +64,9 @@ interface Enquiry {
 
 export default function EnquiriesPage() {
   const { user } = useAuth();
-  const { checkForNewNotifications } = useNotifications();
   const [enquiries, setEnquiries] = useState<Enquiry[]>([]);
   const [loading, setLoading] = useState(true);
+  const loadingRef = useRef(false);
   const [newEnquiryOpen, setNewEnquiryOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   
@@ -105,14 +104,19 @@ export default function EnquiriesPage() {
 
   // Trigger search when filters change
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      loadEnquiries();
-    }, 300); // Debounce search
-    return () => clearTimeout(timeoutId);
+    if (!loadingRef.current) { // Only trigger if not already loading
+      const timeoutId = setTimeout(() => {
+        loadEnquiries();
+      }, 300); // Debounce search
+      return () => clearTimeout(timeoutId);
+    }
   }, [searchOrderNumber, dateFrom, dateTo, platformFilter, statusFilter]);
 
   const loadEnquiries = async () => {
+    if (loadingRef.current) return; // Prevent concurrent requests
+    
     try {
+      loadingRef.current = true;
       setLoading(true);
       
       // Build query parameters
@@ -147,6 +151,7 @@ export default function EnquiriesPage() {
       console.error('Failed to load enquiries:', error);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   };
 
@@ -203,9 +208,8 @@ export default function EnquiriesPage() {
       setSelectedFiles([]);
       setNewEnquiryOpen(false);
       
-      // Reload enquiries and refresh notifications
+      // Reload enquiries
       loadEnquiries();
-      checkForNewNotifications();
     } catch (error) {
       console.error('Failed to create enquiry:', error);
       alert('Failed to create enquiry. Please try again.');

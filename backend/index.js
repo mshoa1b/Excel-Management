@@ -15,8 +15,7 @@ const statsRoutes = require("./routes/stats");
 const bmOrdersRoutes = require("./routes/bmOrders");
 const backmarketCredsRoutes = require("./routes/backmarket");
 const attachmentRoutes = require("./routes/attachments");
-const enquiriesRoutes = require("./routes/enquiries");
-const { router: notificationsRoutes } = require("./routes/notifications"); 
+const enquiriesRoutes = require("./routes/enquiries"); 
 
 const app = express();
 
@@ -50,8 +49,6 @@ app.use((req, res, next) => {
   const isAttachmentUpload = req.url.includes('/api/attachments/upload') || 
                            req.url.includes('/attachments') ||
                            (req.url.includes('/api/enquiries/') && req.url.includes('/attachments'));
-  
-  console.log('Request URL:', req.url, 'Skip JSON parsing:', isAttachmentUpload);
   
   if (isAttachmentUpload) {
     next();
@@ -98,13 +95,13 @@ app.get("/api", (_req, res) => {
   });
 });
 
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
-  console.log('Origin:', req.get('Origin'));
-  console.log('Headers:', req.headers);
-  next();
-});
+// Debug middleware to log all requests (commented out for production)
+// app.use((req, res, next) => {
+//   console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+//   console.log('Origin:', req.get('Origin'));
+//   console.log('Headers:', req.headers);
+//   next();
+// });
 
 // Mount SPECIFIC routers first
 app.use("/api/auth", authRoutes);                 
@@ -115,7 +112,6 @@ app.use("/api/stats", statsRoutes);
 app.use("/api/bmOrders", bmOrdersRoutes);
 app.use("/api/attachments", attachmentRoutes);
 app.use("/api/enquiries", enquiriesRoutes);
-app.use("/api/notifications", notificationsRoutes);
 
 app.use("/api", backmarketCredsRoutes);
 

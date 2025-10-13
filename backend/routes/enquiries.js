@@ -4,58 +4,35 @@ const router = express.Router();
 const authenticateToken = require("../middleware/auth");
 const pool = require("../lib/db");
 const { ROLE } = require("../lib/roles");
-const { createNotification } = require("./notifications");
 const multer = require("multer");
 const path = require("path");
 
-// Configure multer for file uploads
+// Configure multer for file uploads (using memory storage for SFTP)
 const fs = require('fs');
 const crypto = require('crypto');
-
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '..', 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Counter for files uploaded in the same millisecond
-let fileCounter = 0;
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    // Generate highly unique filename to prevent any collisions
-    const timestamp = Date.now();
-    const processId = process.pid;
-    const randomBytes = crypto.randomBytes(8).toString('hex'); // 16 hex chars
-    const counter = (++fileCounter).toString().padStart(4, '0'); // 4 digit counter
-    
-    // Sanitize and get extension
-    const ext = path.extname(file.originalname).toLowerCase();
-    const allowedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.pdf', '.txt'];
-    const safeExt = allowedExts.includes(ext) ? ext : '.bin';
-    
-    // Format: timestamp-processid-counter-randomhex.ext
-    const uniqueFilename = `${timestamp}-${processId}-${counter}-${randomBytes}${safeExt}`;
-    
-    cb(null, uniqueFilename);
-  }
-});
+const sftpManager = require('../lib/sftp');
 
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: {
     fileSize: 10 * 1024 * 1024, // 10MB limit
   },
   fileFilter: (req, file, cb) => {
     // Allow images, PDFs, and text files
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf', 'text/plain'];
-    if (allowedTypes.includes(file.mimetype)) {
+    console.log('File upload attempt:', {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
+    // More permissive image type checking
+    if (file.mimetype.startsWith('image/') || 
+        file.mimetype === 'application/pdf' || 
+        file.mimetype === 'text/plain') {
       cb(null, true);
     } else {
-      cb(new Error('Only images, PDF, and text files are allowed'), false);
+      console.log('File rejected due to unsupported MIME type:', file.mimetype);
+      cb(new Error(`Unsupported file type: ${file.mimetype}. Only images, PDF, and text files are allowed.`), false);
     }
   }
 });
@@ -252,6 +229,22 @@ router.post("/", authenticateToken, async (req, res) => {
       initialStatus = status || 'Awaiting Business'; // Use provided status or default
     }
 
+    // Check if an enquiry already exists for this order number
+    const existingEnquiryQuery = `
+      SELECT id FROM enquiries 
+      WHERE order_number = $1 AND business_id = $2
+      LIMIT 1
+    `;
+    
+    const existingResult = await pool.query(existingEnquiryQuery, [order_number, targetBusinessId]);
+    
+    if (existingResult.rows.length > 0) {
+      return res.status(409).json({ 
+        error: 'Enquiry already exists for this order number',
+        existingEnquiryId: existingResult.rows[0].id
+      });
+    }
+
     const query = `
       INSERT INTO enquiries (status, order_number, platform, description, business_id, created_by)
       VALUES ($1, $2, $3, $4, $5, $6)
@@ -278,17 +271,6 @@ router.post("/", authenticateToken, async (req, res) => {
       description, // Initial message is the description
       createdBy
     ]);
-
-    // Create notification for new enquiry
-    const notificationMessage = `New enquiry created for order #${order_number}`;
-    await createNotification(
-      'new_enquiry', 
-      rows[0].id, 
-      order_number, 
-      initialStatus, 
-      targetBusinessId, 
-      notificationMessage
-    );
 
     res.status(201).json(rows[0]);
   } catch (err) {
@@ -332,36 +314,44 @@ router.post("/:id/messages", authenticateToken, upload.array('files', 5), async 
     // Process file attachments if any
     let attachments = null;
     if (files.length > 0) {
-      attachments = files.map(file => {
-        // Double-check file uniqueness (paranoid mode)
-        let finalFilename = file.filename;
-        let fullPath = path.join(uploadsDir, finalFilename);
-        let attempts = 0;
-        
-        // If by some miracle there's still a collision, add more randomness
-        while (fs.existsSync(fullPath) && attempts < 10) {
-          const extraRandom = crypto.randomBytes(4).toString('hex');
-          const ext = path.extname(file.filename);
-          const nameWithoutExt = path.basename(file.filename, ext);
-          finalFilename = `${nameWithoutExt}-${extraRandom}${ext}`;
-          fullPath = path.join(uploadsDir, finalFilename);
-          attempts++;
+      attachments = [];
+      
+      for (const file of files) {
+        try {
+          console.log('Processing message file:', file.originalname, 'Size:', file.size);
+          
+          // Generate unique filename
+          const fileExtension = path.extname(file.originalname);
+          const timestamp = Date.now();
+          const randomString = crypto.randomBytes(6).toString('hex');
+          const filename = `message_${timestamp}_${randomString}${fileExtension}`;
+          
+          console.log('Generated filename for message:', filename);
+
+          // Upload to SFTP (use enquiryId as sheetId for folder organization)
+          console.log('Starting SFTP upload for message attachment...');
+          const sftpPath = await sftpManager.uploadFile(
+            file.buffer,
+            enquiry.business_id, // Use business_id from the enquiry
+            enquiryId, // Use enquiry ID for folder organization
+            filename
+          );
+          console.log('SFTP upload completed for message attachment, path:', sftpPath);
+
+          attachments.push({
+            originalName: file.originalname,
+            mimetype: file.mimetype,
+            size: file.size,
+            filename: filename, // Store the unique filename
+            sftpPath: sftpPath, // Store the SFTP path
+            uploadedAt: new Date().toISOString(),
+            uniqueId: crypto.randomUUID()
+          });
+        } catch (uploadError) {
+          console.error('Error uploading message file:', file.originalname, uploadError);
+          throw new Error(`Failed to upload file ${file.originalname}: ${uploadError.message}`);
         }
-        
-        // If original filename was changed, rename the file
-        if (finalFilename !== file.filename) {
-          fs.renameSync(path.join(uploadsDir, file.filename), fullPath);
-        }
-        
-        return {
-          originalName: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size,
-          filePath: finalFilename,
-          uploadedAt: new Date().toISOString(),
-          uniqueId: crypto.randomUUID()
-        };
-      });
+      }
     }
 
     // Add the message with attachments
@@ -390,17 +380,6 @@ router.post("/:id/messages", authenticateToken, upload.array('files', 5), async 
     const { rows: updatedEnquiry } = await pool.query(
       "UPDATE enquiries SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING order_number, business_id",
       [newStatus, enquiryId]
-    );
-
-    // Create notification for status update due to new message
-    const notificationMessage = `New message received - status updated to ${newStatus} for order #${updatedEnquiry[0].order_number}`;
-    await createNotification(
-      'status_update', 
-      enquiryId, 
-      updatedEnquiry[0].order_number, 
-      newStatus, 
-      updatedEnquiry[0].business_id, 
-      notificationMessage
     );
 
     res.status(201).json(messageRows[0]);
@@ -447,17 +426,6 @@ router.put("/:id/status", authenticateToken, async (req, res) => {
 
     const { rows } = await pool.query(updateQuery, [status, enquiryId]);
 
-    // Create notification for status update
-    const notificationMessage = `Enquiry status updated to ${status} for order #${rows[0].order_number}`;
-    await createNotification(
-      'status_update', 
-      enquiryId, 
-      rows[0].order_number, 
-      status, 
-      enquiryRows[0].business_id, 
-      notificationMessage
-    );
-
     res.json(rows[0]);
   } catch (err) {
     console.error("PUT /api/enquiries/:id/status error:", err);
@@ -467,6 +435,8 @@ router.put("/:id/status", authenticateToken, async (req, res) => {
 
 // POST /api/enquiries/:id/attachments - Upload files for enquiry
 router.post("/:id/attachments", authenticateToken, upload.array('files', 5), async (req, res) => {
+  console.log('Enquiry attachment upload endpoint hit');
+  
   try {
     const enquiryId = parseInt(req.params.id);
     const myRole = req.user?.role_id;
@@ -475,11 +445,17 @@ router.post("/:id/attachments", authenticateToken, upload.array('files', 5), asy
     console.log('Attachment upload request:', {
       enquiryId,
       filesCount: req.files ? req.files.length : 0,
-      files: req.files,
-      body: req.body
+      files: req.files ? req.files.map(f => ({ 
+        originalname: f.originalname, 
+        mimetype: f.mimetype, 
+        size: f.size 
+      })) : [],
+      body: req.body,
+      user: { id: req.user.id, role: myRole, business: myBiz }
     });
 
     if (!req.files || req.files.length === 0) {
+      console.log('No files in request');
       return res.status(400).json({ message: "No files uploaded" });
     }
 
@@ -498,37 +474,45 @@ router.post("/:id/attachments", authenticateToken, upload.array('files', 5), asy
       return res.status(404).json({ message: "Enquiry not found" });
     }
 
-    // Store file metadata with actual file paths
-    const fileMetadata = req.files.map(file => {
-      // Double-check file uniqueness (paranoid mode)
-      let finalFilename = file.filename;
-      let fullPath = path.join(uploadsDir, finalFilename);
-      let attempts = 0;
-      
-      // If by some miracle there's still a collision, add more randomness
-      while (fs.existsSync(fullPath) && attempts < 10) {
-        const extraRandom = crypto.randomBytes(4).toString('hex');
-        const ext = path.extname(file.filename);
-        const nameWithoutExt = path.basename(file.filename, ext);
-        finalFilename = `${nameWithoutExt}-${extraRandom}${ext}`;
-        fullPath = path.join(uploadsDir, finalFilename);
-        attempts++;
+    // Upload files to SFTP and store metadata
+    const fileMetadata = [];
+    
+    for (const file of req.files) {
+      try {
+        console.log('Processing enquiry file:', file.originalname, 'Size:', file.size);
+        
+        // Generate unique filename
+        const fileExtension = path.extname(file.originalname);
+        const timestamp = Date.now();
+        const randomString = crypto.randomBytes(6).toString('hex');
+        const filename = `enquiry_${timestamp}_${randomString}${fileExtension}`;
+        
+        console.log('Generated filename for enquiry:', filename);
+
+        // Upload to SFTP (use enquiryId as a pseudo-sheetId for folder organization)
+        console.log('Starting SFTP upload for enquiry attachment...');
+        const sftpPath = await sftpManager.uploadFile(
+          file.buffer,
+          enquiryRows[0].business_id, // Use business_id from the enquiry
+          enquiryId, // Use enquiry ID for folder organization
+          filename
+        );
+        console.log('SFTP upload completed for enquiry attachment, path:', sftpPath);
+
+        fileMetadata.push({
+          originalName: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+          filename: filename, // Store the unique filename
+          sftpPath: sftpPath, // Store the SFTP path
+          uploadedAt: new Date().toISOString(),
+          uniqueId: crypto.randomUUID() // Add a UUID for extra uniqueness tracking
+        });
+      } catch (uploadError) {
+        console.error('Error uploading enquiry file:', file.originalname, uploadError);
+        throw new Error(`Failed to upload file ${file.originalname}: ${uploadError.message}`);
       }
-      
-      // If original filename was changed, rename the file
-      if (finalFilename !== file.filename) {
-        fs.renameSync(path.join(uploadsDir, file.filename), fullPath);
-      }
-      
-      return {
-        originalName: file.originalname,
-        mimetype: file.mimetype,
-        size: file.size,
-        filePath: finalFilename, // Store the final unique filename
-        uploadedAt: new Date().toISOString(),
-        uniqueId: crypto.randomUUID() // Add a UUID for extra uniqueness tracking
-      };
-    });
+    }
 
     // Store attachment info in the latest message or create a new message
     const messageQuery = `
@@ -590,7 +574,7 @@ router.get("/:id/attachments/:filename/download", authenticateToken, async (req,
     
     const { rows: messageRows } = await pool.query(messageQuery, [
       enquiryId, 
-      `%"filePath":"${filename}"%`
+      `%"filename":"${filename}"%`
     ]);
 
     console.log('Download request - messageRows found:', messageRows.length);
@@ -602,15 +586,8 @@ router.get("/:id/attachments/:filename/download", authenticateToken, async (req,
       return res.status(404).json({ message: "Attachment not found" });
     }
 
-    // Get the file from disk
-    const filePath = path.join(__dirname, '..', 'uploads', filename);
-    
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ message: "File not found on disk" });
-    }
-
-    // Find the original name from the attachments data
-    let originalName = filename;
+    // Find the attachment metadata including SFTP path and original name
+    let attachmentData = null;
     for (const row of messageRows) {
       try {
         // Handle both string and object formats for attachments
@@ -620,26 +597,83 @@ router.get("/:id/attachments/:filename/download", authenticateToken, async (req,
         }
         
         if (Array.isArray(attachments)) {
-          const attachment = attachments.find(att => att.filePath === filename);
+          const attachment = attachments.find(att => att.filename === filename);
           if (attachment) {
-            originalName = attachment.originalName;
+            attachmentData = attachment;
             break;
           }
         }
       } catch (parseError) {
         console.error('Error parsing attachments:', parseError, 'Row:', row.attachments);
-        // Continue to next row if parsing fails
         continue;
       }
     }
 
-    // Set the proper content type and send file
-    res.setHeader('Content-Disposition', `attachment; filename="${originalName}"`);
-    res.sendFile(filePath);
+    if (!attachmentData || !attachmentData.sftpPath) {
+      return res.status(404).json({ message: "Attachment metadata not found" });
+    }
+
+    // Download file from SFTP
+    console.log('Downloading file from SFTP:', attachmentData.sftpPath);
+    const fileBuffer = await sftpManager.downloadFile(attachmentData.sftpPath);
+    
+    // Set proper headers and send file
+    res.setHeader('Content-Disposition', `attachment; filename="${attachmentData.originalName}"`);
+    res.setHeader('Content-Type', attachmentData.mimetype || 'application/octet-stream');
+    res.setHeader('Content-Length', fileBuffer.length);
+    res.send(fileBuffer);
 
   } catch (err) {
     console.error("GET /api/enquiries/:id/attachments/:filename/download error:", err);
     res.status(500).json({ message: "Failed to download file" });
+  }
+});
+
+// GET /api/enquiries/bulk-counts - Get enquiry counts for multiple order numbers
+router.post("/bulk-counts", authenticateToken, async (req, res) => {
+  try {
+    const myRole = req.user?.role_id;
+    const myBiz = req.user?.business_id;
+    const { order_numbers } = req.body;
+
+    if (!order_numbers || !Array.isArray(order_numbers) || order_numbers.length === 0) {
+      return res.status(400).json({ message: "order_numbers array is required" });
+    }
+
+    // Build query with placeholders for order numbers
+    const placeholders = order_numbers.map((_, index) => `$${index + 2}`).join(', ');
+    const query = `
+      SELECT 
+        order_number,
+        COUNT(*) as count
+      FROM enquiries e
+      WHERE e.business_id = $1 
+        AND e.order_number IN (${placeholders})
+        AND (e.status != 'Resolved' OR (e.status = 'Resolved' AND e.updated_at >= NOW() - INTERVAL '5 days'))
+      GROUP BY order_number
+    `;
+
+    const params = [myBiz, ...order_numbers];
+    console.log('Bulk counts query:', query);
+    console.log('Query params:', params);
+
+    const result = await pool.query(query, params);
+
+    // Create counts object with all order numbers (defaulting to 0)
+    const counts = {};
+    order_numbers.forEach(orderNumber => {
+      counts[orderNumber] = 0;
+    });
+
+    // Update with actual counts
+    result.rows.forEach(row => {
+      counts[row.order_number] = parseInt(row.count);
+    });
+
+    res.json(counts);
+  } catch (err) {
+    console.error("POST /api/enquiries/bulk-counts error:", err);
+    res.status(500).json({ message: "Failed to get enquiry counts" });
   }
 });
 
