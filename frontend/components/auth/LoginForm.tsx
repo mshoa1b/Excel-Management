@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter } from '@/hooks/useRouter';
+import { useLoading } from '@/contexts/LoadingContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,12 +48,14 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { setLoading: setGlobalLoading } = useLoading();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim() || !password) return;
 
     setLoading(true);
+    setGlobalLoading(true);
     setError('');
 
     try {
@@ -60,6 +63,29 @@ export default function LoginForm() {
       const canonicalUser = canonicalizeUser(resp.user);
 
       storeAuth(resp.token, canonicalUser);
+
+      // Fetch and store business name if user has a business
+      if (canonicalUser.business_id) {
+        try {
+          const businessData = await apiClient.getBusiness(Number(canonicalUser.business_id));
+          if (businessData?.name) {
+            // Store business name in session storage and cookie
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('business_name', businessData.name);
+              
+              // Set cookie with 30 days expiration
+              const expires = new Date();
+              expires.setTime(expires.getTime() + 30 * 24 * 60 * 60 * 1000);
+              document.cookie = `business_name=${encodeURIComponent(businessData.name)};expires=${expires.toUTCString()};path=/;SameSite=Lax`;
+              
+              console.log('Stored business name:', businessData.name);
+            }
+          }
+        } catch (businessError) {
+          console.warn('Failed to fetch business data during login:', businessError);
+          // Don't fail the login if business fetch fails
+        }
+      }
 
       switch (canonicalUser.role.name) {
         case 'Superadmin':
@@ -76,6 +102,7 @@ export default function LoginForm() {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
+      setGlobalLoading(false); // Stop global loading on error
     } finally {
       setLoading(false);
     }

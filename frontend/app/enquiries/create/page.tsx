@@ -11,11 +11,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { apiClient } from '@/lib/api';
 import { MessageSquare, ArrowLeft, Upload, X, FileText } from 'lucide-react';
 
 export default function CreateEnquiryPage() {
   const { user } = useAuth();
+  const { businessName } = useBusiness();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -28,9 +30,6 @@ export default function CreateEnquiryPage() {
     description: '',
     status: 'Awaiting Business' // Default status
   });
-
-  // Get business name for status display
-  const businessName = user?.business?.name || 'Business';
 
   useEffect(() => {
     // Update form data if URL parameters change
@@ -214,7 +213,7 @@ export default function CreateEnquiryPage() {
                     <SelectValue placeholder="Select initial status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Awaiting Business">Awaiting {businessName}</SelectItem>
+                    <SelectItem value="Awaiting Business">Awaiting {businessName || 'Business'}</SelectItem>
                     <SelectItem value="Awaiting Techezm">Awaiting Techezm</SelectItem>
                   </SelectContent>
                 </Select>

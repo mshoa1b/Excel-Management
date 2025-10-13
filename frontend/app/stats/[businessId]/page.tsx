@@ -7,6 +7,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -25,13 +26,15 @@ import {
   Clock, 
   AlertTriangle,
   FileText,
-  Download
+  Download,
+  Box
 } from 'lucide-react';
 
 export default function StatsPage() {
   const params = useParams();
   const businessId = params.businessId as string;
   const { user } = useAuth();
+  const { businessName } = useBusiness();
   const { currency, formatCurrency, isLoading: currencyLoading } = useCurrency(businessId);
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -97,16 +100,23 @@ export default function StatsPage() {
     
     const doc = new jsPDF();
     
+    // Business Name at the top
+    doc.setFontSize(16);
+    doc.setFont(undefined, 'bold');
+    const businessDisplayName = businessName || 'Business';
+    doc.text(businessDisplayName, 20, 15);
+    
     // Title
+    doc.setFont(undefined, 'normal');
     doc.setFontSize(20);
-    doc.text('Refunds Statement', 20, 20);
+    doc.text('Refunds Statement', 20, 30);
     
     // Date range and platform info - format dates as dd-mm-yyyy
     doc.setFontSize(12);
     const fromDateFormatted = format(new Date(fromDate), 'dd-MM-yyyy');
     const toDateFormatted = format(new Date(toDate), 'dd-MM-yyyy');
-    doc.text(`Date Range: ${fromDateFormatted} to ${toDateFormatted}`, 20, 35);
-    doc.text(`Platform: ${platform === 'all' ? 'All Platforms' : platform}`, 20, 45);
+    doc.text(`Date Range: ${fromDateFormatted} to ${toDateFormatted}`, 20, 45);
+    doc.text(`Platform: ${platform === 'all' ? 'All Platforms' : platform}`, 20, 55);
     
     // Sort and process data
     const sortedData = data.sort((a, b) => {
@@ -118,7 +128,7 @@ export default function StatsPage() {
     });
     
     // Create table manually with wider columns for full order numbers
-    let yPosition = 65;
+    let yPosition = 75;
     const columnWidths = [30, 70, 35, 35];
     const columnPositions = [20, 50, 120, 155];
     
@@ -275,7 +285,7 @@ export default function StatsPage() {
                   title="Returns (30 days)"
                   value={stats.ordersWithin30Days}
                   description="Within return window"
-                  icon={Calendar}
+                  icon={Box}
                 />
                 <StatsCard
                   title="Out of Warranty"
@@ -378,7 +388,7 @@ export default function StatsPage() {
                                 variant="outline"
                                 className="w-full justify-start text-left font-normal"
                               >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                
                                 {dateFrom ? format(dateFrom, 'PPP') : 'Pick a date'}
                               </Button>
                             </PopoverTrigger>
@@ -406,7 +416,7 @@ export default function StatsPage() {
                                 variant="outline"
                                 className="w-full justify-start text-left font-normal"
                               >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                
                                 {dateTo ? format(dateTo, 'PPP') : 'Pick a date'}
                               </Button>
                             </PopoverTrigger>

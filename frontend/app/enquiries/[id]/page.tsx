@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
+import { useRouter } from '@/hooks/useRouter';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
@@ -10,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/useAuth';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { apiClient } from '@/lib/api';
 import { format } from 'date-fns';
 import { 
@@ -56,6 +58,7 @@ export default function EnquiryDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+  const { businessName } = useBusiness();
   const enquiryId = params.id as string;
   
   const [enquiry, setEnquiry] = useState<EnquiryDetail | null>(null);
@@ -234,6 +237,13 @@ export default function EnquiryDetailPage() {
     }
   };
 
+  const getDisplayStatus = (status: string) => {
+    if (status === 'Awaiting Business') {
+      return `Awaiting ${businessName || 'Business'}`;
+    }
+    return status;
+  };
+
   if (loading) {
     return (
       <ProtectedRoute requiredRole="User">
@@ -283,7 +293,7 @@ export default function EnquiryDetailPage() {
             
             <div className="flex items-center space-x-3">
               <Badge className={getStatusColor(enquiry.status)}>
-                {enquiry.status}
+                {getDisplayStatus(enquiry.status)}
               </Badge>
               
               {/* Status Update Dropdown - only show if not resolved */}
@@ -293,7 +303,7 @@ export default function EnquiryDetailPage() {
                     <SelectValue placeholder="Update Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Awaiting Business">Mark as Awaiting Business</SelectItem>
+                    <SelectItem value="Awaiting Business">Mark as Awaiting {businessName || 'Business'}</SelectItem>
                     <SelectItem value="Awaiting Techezm">Mark as Awaiting Techezm</SelectItem>
                     <SelectItem value="Resolved">Mark as Resolved</SelectItem>
                   </SelectContent>
