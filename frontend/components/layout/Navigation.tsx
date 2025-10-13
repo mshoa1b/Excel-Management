@@ -7,7 +7,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { clearAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import NotificationIcon from '@/components/notifications/NotificationIcon';
 import { 
   LayoutDashboard, 
   FileSpreadsheet, 
@@ -75,14 +74,11 @@ export default function Navigation() {
     <div className="flex flex-col h-full">
       <div className="flex-1">
         <div className="px-4 py-6">
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-teal-600 rounded-lg flex items-center justify-center">
-                <Building2 className="h-4 w-4 text-white" />
-              </div>
-              <span className="text-lg font-bold text-slate-800">Techezm RMA</span>
+          <div className="flex items-center space-x-2 mb-8">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-teal-600 rounded-lg flex items-center justify-center">
+              <Building2 className="h-4 w-4 text-white" />
             </div>
-            <NotificationIcon />
+            <span className="text-lg font-bold text-slate-800">Techezm RMA</span>
           </div>
           
           <nav className="space-y-2">
@@ -153,19 +149,16 @@ export default function Navigation() {
               <span className="text-lg font-bold text-slate-800">Techezm RMA</span>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <NotificationIcon />
-              <Sheet open={isOpen} onOpenChange={setIsOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="sm">
-                    <Menu className="h-6 w-6" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="p-0 w-64">
-                  <NavContent />
-                </SheetContent>
-              </Sheet>
-            </div>
+            <Sheet open={isOpen} onOpenChange={setIsOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <Menu className="h-6 w-6" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-64">
+                <NavContent />
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
         

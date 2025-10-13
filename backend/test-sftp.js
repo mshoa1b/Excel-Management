@@ -1,4 +1,5 @@
 // Test SFTP connection
+require('dotenv').config();
 const sftpManager = require('./lib/sftp');
 
 async function testConnection() {
