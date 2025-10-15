@@ -236,9 +236,11 @@ router.post("/", authenticateToken, async (req, res) => {
       LIMIT 1
     `;
     
+    console.log('Checking for existing enquiry:', { order_number, targetBusinessId });
     const existingResult = await pool.query(existingEnquiryQuery, [order_number, targetBusinessId]);
     
     if (existingResult.rows.length > 0) {
+      console.log('Found existing enquiry:', existingResult.rows[0]);
       return res.status(409).json({ 
         error: 'Enquiry already exists for this order number',
         existingEnquiryId: existingResult.rows[0].id
@@ -626,6 +628,43 @@ router.get("/:id/attachments/:filename/download", authenticateToken, async (req,
   } catch (err) {
     console.error("GET /api/enquiries/:id/attachments/:filename/download error:", err);
     res.status(500).json({ message: "Failed to download file" });
+  }
+});
+
+// GET /api/enquiries/debug/:order_number - Debug endpoint to find conflicting enquiries
+router.get("/debug/:order_number", authenticateToken, async (req, res) => {
+  try {
+    const { order_number } = req.params;
+    const myBiz = req.user?.business_id;
+
+    if (!order_number) {
+      return res.status(400).json({ message: "Order number is required" });
+    }
+
+    const query = `
+      SELECT 
+        e.id, e.status, e.enquiry_date, e.order_number, e.platform, 
+        e.description, e.business_id, e.created_by, e.created_at, e.updated_at,
+        b.name as business_name,
+        u.username as created_by_username
+      FROM enquiries e
+      LEFT JOIN businesses b ON e.business_id = b.id
+      LEFT JOIN users u ON e.created_by = u.id
+      WHERE e.order_number = $1 AND e.business_id = $2
+      ORDER BY e.created_at DESC
+    `;
+
+    const { rows } = await pool.query(query, [order_number, myBiz]);
+
+    res.json({
+      order_number,
+      business_id: myBiz,
+      existing_enquiries: rows,
+      count: rows.length
+    });
+  } catch (err) {
+    console.error("GET /api/enquiries/debug error:", err);
+    res.status(500).json({ message: "Failed to debug enquiries" });
   }
 });
 
