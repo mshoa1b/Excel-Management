@@ -173,17 +173,51 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
 
   // Clear business data when user logs out
   useEffect(() => {
-    const user = getStoredUser();
-    
-    if (!isAuthenticated() || !user) {
+    const clearBusinessData = () => {
       setBusiness(null);
       setBusinessName('');
       
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem(BUSINESS_NAME_SESSION_KEY);
         deleteCookie(BUSINESS_NAME_COOKIE_KEY);
+        console.log('Cleared business data from context');
       }
+    };
+
+    const checkAuthAndClearIfNeeded = () => {
+      const user = getStoredUser();
+      
+      if (!isAuthenticated() || !user) {
+        clearBusinessData();
+      }
+    };
+
+    // Check immediately on mount
+    checkAuthAndClearIfNeeded();
+
+    // Listen for auth-cleared custom event
+    const handleAuthCleared = () => {
+      clearBusinessData();
+    };
+
+    // Listen for storage changes (when auth is cleared from another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'token' || e.key === 'user') {
+        checkAuthAndClearIfNeeded();
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('auth-cleared', handleAuthCleared);
+      window.addEventListener('storage', handleStorageChange);
     }
+
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('auth-cleared', handleAuthCleared);
+        window.removeEventListener('storage', handleStorageChange);
+      }
+    };
   }, []);
 
   return (

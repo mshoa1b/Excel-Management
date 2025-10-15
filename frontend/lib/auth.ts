@@ -28,6 +28,19 @@ export const storeAuth = (token: string, user: User) => {
 export const clearAuth = () => {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
+  
+  // Also clear business-related data from session storage and cookies
+  if (typeof window !== 'undefined') {
+    sessionStorage.removeItem('business_name');
+    
+    // Clear business name cookie
+    document.cookie = 'business_name=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/;';
+    
+    // Dispatch custom event to notify components of logout
+    window.dispatchEvent(new CustomEvent('auth-cleared'));
+    
+    console.log('Cleared auth and business data');
+  }
 };
 
 export const isAuthenticated = (): boolean => {
