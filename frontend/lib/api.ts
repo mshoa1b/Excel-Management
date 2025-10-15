@@ -59,7 +59,28 @@ class ApiClient {
         }
         throw new Error("Unauthorized");
       }
-      throw new Error(await this.parseError(res));
+      
+      // Create a more detailed error for better handling
+      const error = new Error("Request failed") as any;
+      error.status = res.status;
+      error.statusText = res.statusText;
+      
+      // Try to parse JSON response for additional error details
+      try {
+        const errorBody = await res.json();
+        error.response = errorBody;
+        error.message = errorBody?.message || errorBody?.error || res.statusText || "Request failed";
+      } catch {
+        // If not JSON, try to get text
+        try {
+          const errorText = await res.text();
+          error.message = errorText || res.statusText || "Request failed";
+        } catch {
+          error.message = res.statusText || "Request failed";
+        }
+      }
+      
+      throw error;
     }
 
     // handle 204 / empty body

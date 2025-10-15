@@ -169,6 +169,8 @@ export default function EnquiriesPage() {
         business_id: user?.business_id
       };
 
+      console.log('Creating enquiry with data:', enquiryData);
+
       const newEnquiry = await apiClient.request('/enquiries', {
         method: 'POST',
         headers: {
@@ -209,9 +211,46 @@ export default function EnquiriesPage() {
       
       // Reload enquiries
       loadEnquiries();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create enquiry:', error);
-      alert('Failed to create enquiry. Please try again.');
+      
+      // Handle specific error cases
+      if ((error?.message && error.message.includes('409')) || error?.status === 409) {
+        // Try to get more details from the error response
+        let errorMessage = `An enquiry already exists for order number "${formData.order_number}".`;
+        
+        // Check if we can parse additional error details
+        try {
+          if (error?.response && error.response.error) {
+            errorMessage = error.response.error;
+          }
+        } catch (parseError) {
+          // Use default message if parsing fails
+        }
+        
+        const shouldNavigate = confirm(
+          `${errorMessage}\n\nWould you like to view the existing enquiry instead?`
+        );
+        
+        if (shouldNavigate) {
+          // Try to find the existing enquiry and navigate to it
+          try {
+            const existingEnquiries = await apiClient.request(`/enquiries?order_number=${encodeURIComponent(formData.order_number)}`);
+            if (existingEnquiries && existingEnquiries.length > 0) {
+              window.location.href = `/enquiries/${existingEnquiries[0].id}`;
+              return;
+            }
+          } catch (searchError) {
+            console.error('Failed to find existing enquiry:', searchError);
+          }
+          
+          // If we can't find the specific enquiry, just reload the list
+          loadEnquiries();
+        }
+      } else {
+        // Generic error message for other types of errors
+        alert('Failed to create enquiry. Please try again.');
+      }
     }
   };
 
