@@ -8,23 +8,55 @@ const getSheets = async (business_id) => {
 
 // ---------------- CREATE SHEET ----------------
 const createSheet = async (sheet) => {
+  console.log('Creating sheet with data:', JSON.stringify(sheet, null, 2));
+  
   const {
     business_id, date_received, order_no, order_date, customer_name, imei, sku,
     customer_comment, multiple_return, apple_google_id, return_type, locked, oow_case,
     replacement_available, done_by, blocked_by, cs_comment, resolution,
     refund_amount, refund_date, return_tracking_no, issue, out_of_warranty,
-    additional_notes, status, manager_notes
+    additional_notes, status, manager_notes, return_within_30_days
   } = sheet;
 
   const platform = /^\d{8}$/.test(order_no) ? 'Back Market' : 'Amazon';
+  
   // Convert empty strings to null for date fields to prevent PostgreSQL errors
   const safeDateReceived = date_received === '' ? null : date_received;
   const safeOrderDate = order_date === '' ? null : order_date;
   const safeRefundDate = refund_date === '' ? null : refund_date;
 
-  const return_within_30_days = (safeDateReceived && safeOrderDate)
-    ? Math.floor((new Date(safeDateReceived) - new Date(safeOrderDate)) / (1000*60*60*24)) <= 30 ? 'Yes' : 'No'
-    : 'No';
+  console.log('Date processing:', { date_received, safeDateReceived, order_date, safeOrderDate, refund_date, safeRefundDate });
+
+  // Use provided return_within_30_days if it's already a string, otherwise calculate it
+  let calculated_return_within_30_days = 'No';
+  if (typeof return_within_30_days === 'string') {
+    calculated_return_within_30_days = return_within_30_days;
+  } else if (safeDateReceived && safeOrderDate) {
+    try {
+      const receivedDate = new Date(safeDateReceived);
+      const orderDate = new Date(safeOrderDate);
+      
+      if (!isNaN(receivedDate.getTime()) && !isNaN(orderDate.getTime())) {
+        const diffTime = Math.abs(receivedDate.getTime() - orderDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        calculated_return_within_30_days = diffDays <= 30 ? 'Yes' : 'No';
+        console.log('Calculated return_within_30_days:', { diffTime, diffDays, calculated_return_within_30_days });
+      }
+    } catch (error) {
+      console.log('Error calculating return_within_30_days:', error);
+      calculated_return_within_30_days = 'No';
+    }
+  }
+
+  const queryParams = [
+    business_id, safeDateReceived, order_no, safeOrderDate, customer_name, imei, sku,
+    customer_comment, multiple_return, apple_google_id, return_type, locked || 'No', oow_case || 'No',
+    replacement_available, done_by, blocked_by, cs_comment, resolution, refund_amount, safeRefundDate,
+    return_tracking_no, platform, calculated_return_within_30_days, issue, out_of_warranty || 'Choose',
+    additional_notes, status, manager_notes
+  ];
+
+  console.log('Query parameters:', queryParams);
 
   const result = await pool.query(
     `INSERT INTO sheets
@@ -35,15 +67,10 @@ const createSheet = async (sheet) => {
      VALUES
       ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
      RETURNING *`,
-    [
-      business_id, safeDateReceived, order_no, safeOrderDate, customer_name, imei, sku,
-      customer_comment, multiple_return, apple_google_id, return_type, locked || 'No', oow_case || 'No',
-      replacement_available, done_by, blocked_by, cs_comment, resolution, refund_amount, safeRefundDate,
-      return_tracking_no, platform, return_within_30_days, issue, out_of_warranty || 'Choose',
-      additional_notes, status, manager_notes
-    ]
+    queryParams
   );
 
+  console.log('Sheet created successfully:', result.rows[0]);
   return result.rows[0];
 };
 

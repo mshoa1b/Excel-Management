@@ -161,7 +161,12 @@ router.post("/:businessId", authenticateToken, assertBusinessScope, async (req, 
     res.status(201).json(created);
   } catch (err) {
     console.error("POST /api/sheets/:businessId error:", err);
-    res.status(500).json({ message: "Failed to create sheet" });
+    // Return more detailed error information for debugging
+    res.status(500).json({ 
+      message: "Failed to create sheet",
+      error: err.message,
+      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
