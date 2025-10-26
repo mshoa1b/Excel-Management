@@ -184,9 +184,11 @@ const colorForRow = (r?: SheetRecord): string => {
     }
 
     if (!notEmpty(r.blocked_by)) {
-      if (eq(r.return_type, 'refund')) {
-        if (notEmpty(r.locked) && !eq(r.locked, 'No')) return '#DC2626';
-        if (notEmpty(r.oow_case) && !eq(r.oow_case, 'No')) return '#B45309';
+
+      if (notEmpty(r.locked) && !eq(r.locked, 'No') && !eq(r.locked, 'Choose')) return '#DC2626';
+      if (notEmpty(r.oow_case) && !eq(r.oow_case, 'No') && !eq(r.locked, 'Choose')) return '#B45309';
+
+      if (eq(r.return_type, 'refund')) {        
         if ((!notEmpty(r.locked) || eq(r.locked, 'No')) && (!notEmpty(r.oow_case) || eq(r.oow_case, 'No')))
           return '#F97316';
       }
