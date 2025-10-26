@@ -25,10 +25,9 @@ router.get("/:businessId", authenticateToken, assertBusinessScope, async (req, r
   try {
     const businessId = Number(req.params.businessId);
     
-    // Get first day of current month
-    const now = new Date();
-    const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const firstOfMonthStr = firstOfMonth.toISOString().split('T')[0];
+    // Get today's date
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
 
     const { rows } = await pool.query(
       `
@@ -42,7 +41,7 @@ router.get("/:businessId", authenticateToken, assertBusinessScope, async (req, r
       WHERE business_id = $1
         AND (
           status != 'Resolved'
-          OR (status = 'Resolved' AND date_received >= $2)
+          OR (status = 'Resolved' AND updated_at >= $2)
         )
       ORDER BY 
         CASE WHEN blocked_by IS NOT NULL AND blocked_by != '' THEN 0 ELSE 1 END,
@@ -51,7 +50,7 @@ router.get("/:businessId", authenticateToken, assertBusinessScope, async (req, r
         date_received DESC,
         id DESC
       `,
-      [businessId, firstOfMonthStr]
+      [businessId, todayStr]
     );
     res.json(rows);
   } catch (err) {
