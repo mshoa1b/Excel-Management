@@ -573,9 +573,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     const newSheet = await createSheet(businessId, base);
     setRowData(prev => {
       const newRow = normalizeForSave({ ...base, ...newSheet } as SheetRecord);
-      const newRows = [...prev, newRow];
+      const newRows = [newRow, ...prev];
       setTimeout(() => {
-        apiRef.current?.ensureIndexVisible(newRows.length - 1, 'middle');
+        apiRef.current?.ensureIndexVisible(0, 'middle');
         autoSizeNonMultiline();
         reflowAutoHeight();
       }, 50);
