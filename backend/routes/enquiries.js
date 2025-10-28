@@ -693,8 +693,6 @@ router.post("/bulk-counts", authenticateToken, async (req, res) => {
     `;
 
     const params = [myBiz, ...order_numbers];
-    console.log('Bulk counts query:', query);
-    console.log('Query params:', params);
 
     const result = await pool.query(query, params);
 

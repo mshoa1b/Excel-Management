@@ -185,11 +185,13 @@ const colorForRow = (r?: SheetRecord): string => {
 
     if (!notEmpty(r.blocked_by)) {
 
+      if (!notEmpty(r.locked) || eq(r.locked, 'Choose')) return '#1D4ED8';
+      if (!notEmpty(r.oow_case) && eq(r.oow_case, 'Choose')) return '#1D4ED8';
+
       if (notEmpty(r.locked) && eq(r.locked, 'No') && !eq(r.locked, 'Choose')) return '#DC2626';
       if (notEmpty(r.oow_case) && !eq(r.oow_case, 'No') && !eq(r.locked, 'Choose')) return '#B45309';
 
-      if (!notEmpty(r.locked) || !eq(r.locked, 'Choose')) return '#1D4ED8';
-      if (!notEmpty(r.oow_case) && !eq(r.oow_case, 'Choose')) return '#1D4ED8';
+      
 
       if (eq(r.return_type, 'refund')) {        
         if ((!notEmpty(r.locked) || eq(r.locked, 'No')) && (!notEmpty(r.oow_case) || eq(r.oow_case, 'No')))
@@ -700,8 +702,10 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   // Columns
   const colDefs: ColDef<SheetRecord>[] = useMemo(
     () => [
-      { headerName: 'Blocked By', field: 'blocked_by', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: blockedByOptions }, pinned: 'left', minWidth: 120 },
-      { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, minWidth: 120 },
+      { headerName: '', checkboxSelection: true, pinned: 'left', width: 50, suppressMenu: true },
+      { headerName: 'Order Number', field: 'order_no', editable: true, minWidth: 130, pinned: 'left' },
+      { headerName: 'Blocked By', field: 'blocked_by', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: blockedByOptions }, minWidth: 120, pinned: 'left' },
+      { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, minWidth: 120, hide: true },
 
       { headerName: 'Date Received', field: 'date_received', editable: true, 
         cellEditor: 'agDateStringCellEditor',
@@ -714,7 +718,6 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         valueParser: dateParser,
         minWidth: 120 },
 
-      { headerName: 'Order Number', field: 'order_no', editable: true, minWidth: 130 },
       { headerName: 'Customer Name', field: 'customer_name', editable: true, minWidth: 140 },
       { headerName: 'IMEI', field: 'imei', editable: true, minWidth: 130 },
       { headerName: 'SKU / Product', field: 'sku', editable: true, minWidth: 150 },
@@ -1000,7 +1003,6 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           onGridReady={onGridReady}
           rowData={filteredData}
           columnDefs={colDefs}
-          rowSelection={{ mode: 'multiRow' }}
           animateRows
           singleClickEdit
           stopEditingWhenCellsLoseFocus
