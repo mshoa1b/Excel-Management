@@ -36,12 +36,12 @@ router.get("/:businessId", authenticateToken, assertBusinessScope, async (req, r
         customer_comment, multiple_return, apple_google_id, return_type, locked, oow_case,
         replacement_available, done_by, blocked_by, cs_comment, resolution,
         COALESCE(refund_amount,0)::float AS refund_amount, refund_date, return_tracking_no,
-        platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes
+        platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes, updated_at
       FROM sheets
       WHERE business_id = $1
         AND (
           status != 'Resolved'
-          OR (status = 'Resolved' AND updated_at >= $2)
+          OR (status = 'Resolved' AND DATE(updated_at) = $2)
         )
       ORDER BY 
         CASE WHEN blocked_by IS NOT NULL AND blocked_by != '' THEN 0 ELSE 1 END,
@@ -76,7 +76,7 @@ router.get("/:businessId/search", authenticateToken, assertBusinessScope, async 
         customer_comment, multiple_return, apple_google_id, return_type, locked, oow_case,
         replacement_available, done_by, blocked_by, cs_comment, resolution,
         COALESCE(refund_amount,0)::float AS refund_amount, refund_date, return_tracking_no,
-        platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes
+        platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes, updated_at
       FROM sheets
       WHERE business_id = $1
         AND (
@@ -117,7 +117,7 @@ router.get("/:businessId/daterange", authenticateToken, assertBusinessScope, asy
         customer_comment, multiple_return, apple_google_id, return_type, locked, oow_case,
         replacement_available, done_by, blocked_by, cs_comment, resolution,
         COALESCE(refund_amount,0)::float AS refund_amount, refund_date, return_tracking_no,
-        platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes
+        platform, return_within_30_days, issue, out_of_warranty, additional_notes, status, manager_notes, updated_at
       FROM sheets
       WHERE business_id = $1
         AND date_received >= $2

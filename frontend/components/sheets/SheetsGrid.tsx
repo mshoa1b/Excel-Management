@@ -60,6 +60,7 @@ export interface SheetRecord {
   additional_notes: string;
   status: string;
   manager_notes: string;
+  updated_at?: string;
 }
 
 const blockedByOptions = [
@@ -338,6 +339,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               refund_date: row.refund_date ? toYMD(row.refund_date) : '',
               return_within_30_days: !!row.return_within_30_days,
               out_of_warranty: row.out_of_warranty || 'Choose',
+              updated_at: row.updated_at,
             }));
             dataToFilter = formatted;
           } catch (error) {
@@ -465,6 +467,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           refund_date: row.refund_date ? toYMD(row.refund_date) : '',
           return_within_30_days: !!row.return_within_30_days,
           out_of_warranty: row.out_of_warranty || 'Choose',
+          updated_at: row.updated_at,
         }))
       : [];
     setRowData(formatted);
@@ -503,6 +506,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         refund_date: row.refund_date ? toYMD(row.refund_date) : '',
         return_within_30_days: !!row.return_within_30_days,
         out_of_warranty: row.out_of_warranty || 'Choose',
+        updated_at: row.updated_at,
       }));
       
       setRowData(formatted);
@@ -727,7 +731,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       { headerName: 'CS Comment', field: 'cs_comment', editable: true, wrapText: true, autoHeight: true, width: 260 },
 
       { headerName: 'Multiple Return', field: 'multiple_return', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','No','2nd Time','3rd Time'] }, minWidth: 130 },
-      { headerName: 'Apple/Google ID', field: 'apple_google_id', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Yes','Yes-Issue raised','No'] }, minWidth: 150 },
+      { headerName: 'Apple/Google ID', field: 'apple_google_id', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Yes','Yes-Issue raised','No'] }, minWidth: 150, hide: true },
       { headerName: 'Return Type', field: 'return_type', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Refund','URGENT REPAIR','Replacement','Repair','Faulty','Other'] }, minWidth: 130 },
 
       { headerName: 'Locked', field: 'locked', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: lockedOptions }, minWidth: 120 },
@@ -761,6 +765,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
       { headerName: 'Status', field: 'status', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Pending','In Progress','Resolved'] }, minWidth: 120 },
       { headerName: 'Manager Notes', field: 'manager_notes', editable: true, wrapText: true, autoHeight: true, width: 260 },
+
+      { headerName: 'Last Updated', field: 'updated_at', editable: false, minWidth: 150, valueFormatter: (p) => p.value ? format(new Date(p.value), 'dd-MM-yyyy HH:mm') : '' },
 
       {
         headerName: 'Actions',
