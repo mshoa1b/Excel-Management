@@ -18,12 +18,12 @@ import { Calendar } from '@/components/ui/calendar';
 import { apiClient } from '@/lib/api';
 import { Stats } from '@/types';
 import { format } from 'date-fns';
-import { 
-  FileSpreadsheet, 
-  DollarSign, 
-  TrendingUp, 
-  Calendar as CalendarIcon, 
-  Clock, 
+import {
+  FileSpreadsheet,
+  DollarSign,
+  TrendingUp,
+  Calendar as CalendarIcon,
+  Clock,
   AlertTriangle,
   FileText,
   Download,
@@ -39,7 +39,7 @@ export default function StatsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedRange, setSelectedRange] = useState('1m');
-  
+
   // Refunds Statement state
   const [dateFrom, setDateFrom] = useState<Date>(new Date());
   const [dateTo, setDateTo] = useState<Date>(new Date());
@@ -67,25 +67,25 @@ export default function StatsPage() {
   const handleGenerateRefundsReport = async () => {
     try {
       setGeneratingPdf(true);
-      
+
       // Format dates for API
       const fromDate = format(dateFrom, 'yyyy-MM-dd');
       const toDate = format(dateTo, 'yyyy-MM-dd');
-      
+
       // Fetch filtered data from API
       const params = new URLSearchParams({
         dateFrom: fromDate,
         dateTo: toDate,
         platform: selectedPlatform
       });
-      
+
       const response = await apiClient.request(`/sheets/${businessId}/refunds-report?${params}`);
-      
+
       const data = response;
-      
+
       // Generate PDF
-      await generateRefundsPDF(data, fromDate, toDate, selectedPlatform);
-      
+      await generateRefundsPDF(data, fromDate, toDate, selectedPlatform, currency?.symbol || '$');
+
     } catch (error) {
       console.error('Error generating refunds report:', error);
       alert('Failed to generate refunds report. Please try again.');
@@ -93,31 +93,31 @@ export default function StatsPage() {
       setGeneratingPdf(false);
     }
   };
-  
-  const generateRefundsPDF = async (data: any[], fromDate: string, toDate: string, platform: string) => {
+
+  const generateRefundsPDF = async (data: any[], fromDate: string, toDate: string, platform: string, currencySymbol: string) => {
     // Dynamic import for client-side only
     const jsPDF = (await import('jspdf')).default;
-    
+
     const doc = new jsPDF();
-    
+
     // Business Name at the top
     doc.setFontSize(16);
-    doc.setFont(undefined, 'bold');
+    doc.setFont('helvetica', 'bold');
     const businessDisplayName = businessName || 'Business';
     doc.text(businessDisplayName, 20, 15);
-    
+
     // Title
-    doc.setFont(undefined, 'normal');
+    doc.setFont('helvetica', 'normal');
     doc.setFontSize(20);
     doc.text('Refunds Statement', 20, 30);
-    
+
     // Date range and platform info - format dates as dd-mm-yyyy
     doc.setFontSize(12);
     const fromDateFormatted = format(new Date(fromDate), 'dd-MM-yyyy');
     const toDateFormatted = format(new Date(toDate), 'dd-MM-yyyy');
     doc.text(`Date Range: ${fromDateFormatted} to ${toDateFormatted}`, 20, 45);
     doc.text(`Platform: ${platform === 'all' ? 'All Platforms' : platform}`, 20, 55);
-    
+
     // Sort and process data
     const sortedData = data.sort((a, b) => {
       // Order by platform first, then by date
@@ -126,12 +126,12 @@ export default function StatsPage() {
       }
       return new Date(a.refund_date).getTime() - new Date(b.refund_date).getTime();
     });
-    
+
     // Create table manually with wider columns for full order numbers
     let yPosition = 75;
     const columnWidths = [30, 70, 35, 35];
     const columnPositions = [20, 50, 120, 155];
-    
+
     // Table headers
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
@@ -139,12 +139,12 @@ export default function StatsPage() {
     doc.text('Order Number', columnPositions[1], yPosition);
     doc.text('Refund Amount', columnPositions[2], yPosition);
     doc.text('Platform', columnPositions[3], yPosition);
-    
+
     // Header line
     yPosition += 5;
     doc.line(20, yPosition, 190, yPosition);
     yPosition += 10;
-    
+
     // Table rows
     doc.setFont('helvetica', 'normal');
     sortedData.forEach((row, index) => {
@@ -152,46 +152,53 @@ export default function StatsPage() {
         doc.addPage();
         yPosition = 20;
       }
-      
+
       const refundDate = format(new Date(row.refund_date), 'dd/MM/yyyy');
       const orderNumber = row.order_number || '-'; // Show full order number without truncation
-      const refundAmount = row.refund_amount ? `$${parseFloat(row.refund_amount).toFixed(2)}` : '$0.00';
+      const refundAmount = row.refund_amount ? `${currencySymbol}${parseFloat(row.refund_amount).toFixed(2)}` : `${currencySymbol}0.00`;
       const platform = row.platform || '-';
-      
+
       // Use smaller font for order numbers if they're very long
       const isLongOrderNumber = orderNumber.length > 15;
+      doc.setFontSize(10);
+      doc.text(refundDate, columnPositions[0], yPosition);
+
       if (isLongOrderNumber) {
         doc.setFontSize(8);
       }
-      
-      doc.text(refundDate, columnPositions[0], yPosition);
+
+
       doc.text(orderNumber, columnPositions[1], yPosition);
+
+      if (isLongOrderNumber) {
+        doc.setFontSize(10);
+      }
       doc.text(refundAmount, columnPositions[2], yPosition);
       doc.text(platform, columnPositions[3], yPosition);
-      
+
       // Reset font size if it was changed
       if (isLongOrderNumber) {
         doc.setFontSize(10);
       }
-      
+
       yPosition += 8;
     });
-    
+
     // Summary
     if (yPosition > 250) {
       doc.addPage();
       yPosition = 20;
     }
-    
+
     yPosition += 10;
     doc.line(20, yPosition, 190, yPosition);
     yPosition += 10;
-    
+
     const totalAmount = sortedData.reduce((sum, row) => sum + (parseFloat(row.refund_amount) || 0), 0);
     doc.setFont('helvetica', 'bold');
     doc.text(`Total Records: ${sortedData.length}`, 20, yPosition);
-    doc.text(`Total Refund Amount: $${totalAmount.toFixed(2)}`, 120, yPosition);
-    
+    doc.text(`Total Refund Amount: ${currencySymbol}${totalAmount.toFixed(2)}`, 120, yPosition);
+
     // Save the PDF with properly formatted dates
     doc.save(`refunds-statement-${fromDateFormatted}-to-${toDateFormatted}.pdf`);
   };
@@ -224,13 +231,13 @@ export default function StatsPage() {
     <ProtectedRoute businessId={businessId}>
       <DashboardLayout>
         <div className="space-y-8">
-          
+
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
               <h1 className="text-3xl font-bold text-slate-800 mb-2">Analytics Dashboard</h1>
               <p className="text-slate-600">Business insights and statistics</p>
             </div>
-            
+
             <div className="flex items-center space-x-2">
               <span className="text-sm text-slate-600">Time Range:</span>
               <Select value={selectedRange} onValueChange={setSelectedRange}>
@@ -310,25 +317,25 @@ export default function StatsPage() {
                         <span className="text-slate-600">Within 30 days</span>
                         <div className="flex items-center space-x-2">
                           <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div 
+                            <div
                               className="h-full bg-green-500 rounded-full"
-                              style={{ 
-                                width: `${stats.totalOrders > 0 ? (stats.ordersWithin30Days / stats.totalOrders) * 100 : 0}%` 
+                              style={{
+                                width: `${stats.totalOrders > 0 ? (stats.ordersWithin30Days / stats.totalOrders) * 100 : 0}%`
                               }}
                             />
                           </div>
                           <span className="font-medium">{stats.ordersWithin30Days}</span>
                         </div>
                       </div>
-                      
+
                       <div className="flex justify-between items-center">
                         <span className="text-slate-600">Out of warranty</span>
                         <div className="flex items-center space-x-2">
                           <div className="w-24 h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div 
+                            <div
                               className="h-full bg-red-500 rounded-full"
-                              style={{ 
-                                width: `${stats.totalOrders > 0 ? (stats.outOfWarrantyReturns / stats.totalOrders) * 100 : 0}%` 
+                              style={{
+                                width: `${stats.totalOrders > 0 ? (stats.outOfWarrantyReturns / stats.totalOrders) * 100 : 0}%`
                               }}
                             />
                           </div>
@@ -352,12 +359,12 @@ export default function StatsPage() {
                         <span className="text-slate-600">Total Refund Amount</span>
                         <span className="font-bold text-lg">{formatCurrency(stats.totalRefundAmount)}</span>
                       </div>
-                      
+
                       <div className="flex justify-between items-center py-2 border-b border-slate-100">
                         <span className="text-slate-600">Average per Order</span>
                         <span className="font-bold text-lg">{formatCurrency(stats.averageRefundAmount)}</span>
                       </div>
-                      
+
                       <div className="flex justify-between items-center py-2">
                         <span className="text-slate-600">Total Orders</span>
                         <span className="font-bold text-lg">{stats.totalOrders}</span>
@@ -366,7 +373,7 @@ export default function StatsPage() {
                   </CardContent>
                 </Card>
               </div>
-              
+
               {/* Refunds Statement Card */}
               <div className="mt-6">
                 <Card>
@@ -388,7 +395,7 @@ export default function StatsPage() {
                                 variant="outline"
                                 className="w-full justify-start text-left font-normal"
                               >
-                                
+
                                 {dateFrom ? format(dateFrom, 'PPP') : 'Pick a date'}
                               </Button>
                             </PopoverTrigger>
@@ -407,7 +414,7 @@ export default function StatsPage() {
                             </PopoverContent>
                           </Popover>
                         </div>
-                        
+
                         <div className="space-y-2">
                           <Label htmlFor="date-to">To Date</Label>
                           <Popover open={dateToOpen} onOpenChange={setDateToOpen}>
@@ -416,7 +423,7 @@ export default function StatsPage() {
                                 variant="outline"
                                 className="w-full justify-start text-left font-normal"
                               >
-                                
+
                                 {dateTo ? format(dateTo, 'PPP') : 'Pick a date'}
                               </Button>
                             </PopoverTrigger>
@@ -436,7 +443,7 @@ export default function StatsPage() {
                           </Popover>
                         </div>
                       </div>
-                      
+
                       {/* Platform Selection */}
                       <div className="space-y-2">
                         <Label htmlFor="platform-select">Platform</Label>
@@ -446,15 +453,15 @@ export default function StatsPage() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="all">All Platforms</SelectItem>
-                            <SelectItem value="Backmarket">Backmarket</SelectItem>
+                            <SelectItem value="Back Market">Back Market</SelectItem>
                             <SelectItem value="Amazon">Amazon</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                      
+
                       {/* Generate Button */}
-                      <Button 
-                        onClick={handleGenerateRefundsReport} 
+                      <Button
+                        onClick={handleGenerateRefundsReport}
                         disabled={generatingPdf || !dateFrom || !dateTo}
                         className="w-full"
                       >
