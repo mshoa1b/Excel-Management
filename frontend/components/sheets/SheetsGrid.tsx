@@ -22,7 +22,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { AttachmentManager } from './AttachmentManager';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
@@ -1039,6 +1040,25 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         <Button className="gap-2" onClick={addRow}><Plus /> New Row</Button>
         <Button variant="outline" className="gap-2" onClick={removeSelected}><Trash2 /> Delete Selected</Button>
         <Button variant="outline" className="gap-2" onClick={refresh}><RotateCcw /> Refresh</Button>
+        <Button
+          variant="outline"
+          className="gap-2 ml-auto"
+          onClick={() => {
+            const ws = XLSX.utils.json_to_sheet(filteredData.map(row => ({
+              ...row,
+              // Format dates for Excel
+              date_received: row.date_received ? format(new Date(row.date_received), 'dd/MM/yyyy') : '',
+              order_date: row.order_date ? format(new Date(row.order_date), 'dd/MM/yyyy') : '',
+              refund_date: row.refund_date ? format(new Date(row.refund_date), 'dd/MM/yyyy') : '',
+              updated_at: row.updated_at ? format(new Date(row.updated_at), 'dd/MM/yyyy HH:mm') : ''
+            })));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Sheets");
+            XLSX.writeFile(wb, `sheets_export_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`);
+          }}
+        >
+          <Download className="h-4 w-4" /> Download XLS
+        </Button>
       </div>
 
       {/* Marketplace totals for today */}
