@@ -5,15 +5,15 @@ const getApiBaseUrl = () => {
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
-  
+
   // Fallback logic for development vs production
   if (typeof window !== 'undefined') {
     // Client-side: check if we're in production
-    return window.location.hostname.includes('vercel.app') 
+    return window.location.hostname.includes('vercel.app')
       ? 'https://excel-management-backend.vercel.app/api'
       : '/api'; // Local development
   }
-  
+
   // Server-side rendering fallback
   return 'http://localhost:5000/api';
 };
@@ -41,10 +41,10 @@ class ApiClient {
 
   async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_BASE_URL}${endpoint}`;
-    
+
     // Don't set Content-Type for FormData - let browser set it automatically
     const isFormData = options.body instanceof FormData;
-    
+
     const res = await fetch(url, {
       ...options,
       headers: { ...this.getAuthHeaders(!isFormData), ...(options.headers || {}) },
@@ -59,12 +59,12 @@ class ApiClient {
         }
         throw new Error("Unauthorized");
       }
-      
+
       // Create a more detailed error for better handling
       const error = new Error("Request failed") as any;
       error.status = res.status;
       error.statusText = res.statusText;
-      
+
       // Try to parse JSON response for additional error details
       try {
         const errorBody = await res.json();
@@ -79,7 +79,7 @@ class ApiClient {
           error.message = res.statusText || "Request failed";
         }
       }
-      
+
       throw error;
     }
 
@@ -213,11 +213,11 @@ class ApiClient {
     Array.from(files).forEach(file => {
       formData.append('files', file);
     });
-    
+
     // For file uploads, we need to use fetch directly to avoid Content-Type header
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     const url = `${API_BASE_URL}/attachments/upload/${sheetId}`;
-    
+
     return fetch(url, {
       method: "POST",
       headers: {
@@ -252,14 +252,20 @@ class ApiClient {
   }
 
   getAttachmentViewUrl(attachmentId: number) {
-    const baseUrl = getApiBaseUrl().replace('/api', '');
+    const apiBase = getApiBaseUrl();
+    // Remove trailing /api if present to avoid duplication
+    const baseUrl = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
+
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
     return `${baseUrl}/api/attachments/view/${attachmentId}${tokenParam}`;
   }
 
   getAttachmentDownloadUrl(attachmentId: number) {
-    const baseUrl = getApiBaseUrl().replace('/api', '');
+    const apiBase = getApiBaseUrl();
+    // Remove trailing /api if present to avoid duplication
+    const baseUrl = apiBase.endsWith('/api') ? apiBase.slice(0, -4) : apiBase;
+
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null;
     const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
     return `${baseUrl}/api/attachments/download/${attachmentId}${tokenParam}`;
