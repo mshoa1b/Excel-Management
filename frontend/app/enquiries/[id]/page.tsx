@@ -10,13 +10,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { apiClient } from '@/lib/api';
 import { format } from 'date-fns';
-import { 
-  ArrowLeft, 
-  Send, 
+import {
+  ArrowLeft,
+  Send,
   Calendar,
   Package,
   Building2,
@@ -60,12 +68,14 @@ export default function EnquiryDetailPage() {
   const { user } = useAuth();
   const { businessName } = useBusiness();
   const enquiryId = params.id as string;
-  
+
   const [enquiry, setEnquiry] = useState<EnquiryDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [messageFiles, setMessageFiles] = useState<File[]>([]);
+  const [showStatusPrompt, setShowStatusPrompt] = useState(false);
+  const [proposedStatus, setProposedStatus] = useState<string>('');
 
   useEffect(() => {
     if (enquiryId) {
@@ -92,7 +102,7 @@ export default function EnquiryDetailPage() {
 
     try {
       setSending(true);
-      
+
       // If there are files, send as FormData
       if (messageFiles.length > 0) {
         const formData = new FormData();
@@ -100,7 +110,7 @@ export default function EnquiryDetailPage() {
         messageFiles.forEach(file => {
           formData.append('files', file);
         });
-        
+
         await apiClient.request(`/enquiries/${enquiry.id}/messages`, {
           method: 'POST',
           body: formData
@@ -119,7 +129,26 @@ export default function EnquiryDetailPage() {
       setNewMessage('');
       setMessageFiles([]);
       // Reload enquiry to get updated messages
-      loadEnquiry();
+      await loadEnquiry();
+
+      // Prompt for status update
+      // Determine proposed status (opposite of current if applicable)
+      let nextStatus = enquiry.status;
+      if (enquiry.status === 'Awaiting Business' && user?.role.name !== 'Business Admin' && user?.role.name !== 'User') {
+        // If I am Techezm (Superadmin) and it was waiting for Business, I probably don't need to change it?
+        // Wait, if it was "Awaiting Business" and I (Techezm) replied, it's weird. Usually I reply when it's "Awaiting Techezm".
+        // If it's "Awaiting Techezm" and I (Techezm) reply, I should change to "Awaiting Business".
+      }
+
+      if (enquiry.status === 'Awaiting Techezm') {
+        nextStatus = 'Awaiting Business';
+      } else if (enquiry.status === 'Awaiting Business') {
+        nextStatus = 'Awaiting Techezm';
+      }
+
+      setProposedStatus(nextStatus);
+      setShowStatusPrompt(true);
+
     } catch (error) {
       console.error('Failed to send message:', error);
       alert('Failed to send message. Please try again.');
@@ -148,12 +177,17 @@ export default function EnquiryDetailPage() {
     }
   };
 
+  const confirmStatusUpdate = async () => {
+    await handleStatusUpdate(proposedStatus);
+    setShowStatusPrompt(false);
+  };
+
   const handleDownloadAttachment = async (attachment: any, messageId: number) => {
     try {
       if (!attachment.filename && !attachment.filePath) {
         // Fallback for old attachments that only have metadata
         const fileInfo = `File: ${attachment.originalName}\nSize: ${attachment.size} bytes\nType: ${attachment.mimetype}\nUploaded: ${new Date(attachment.uploadedAt).toLocaleString()}\n\nNote: This is an old attachment where only metadata was stored.`;
-        
+
         const blob = new Blob([fileInfo], { type: 'text/plain' });
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -170,10 +204,10 @@ export default function EnquiryDetailPage() {
       // Use filename (new format) or filePath (legacy format) for the download URL
       const fileIdentifier = attachment.filename || attachment.filePath;
       const downloadUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/enquiries/${params.id}/attachments/${fileIdentifier}/download`;
-      
+
       // Get auth token
       const token = localStorage.getItem('token');
-      
+
       const response = await fetch(downloadUrl, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -208,15 +242,15 @@ export default function EnquiryDetailPage() {
   const handleMessageFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const allowedTypes = ['image/', 'application/pdf', 'text/plain'];
-    
-    const validFiles = files.filter(file => 
+
+    const validFiles = files.filter(file =>
       allowedTypes.some(type => file.type.startsWith(type))
     );
-    
+
     if (validFiles.length !== files.length) {
       alert('Only images, PDF, and text files are allowed');
     }
-    
+
     setMessageFiles(prev => [...prev, ...validFiles]);
   };
 
@@ -290,12 +324,12 @@ export default function EnquiryDetailPage() {
                 <p className="text-slate-600">Order: {enquiry.order_number}</p>
               </div>
             </div>
-            
+
             <div className="flex items-center space-x-3">
               <Badge className={getStatusColor(enquiry.status)}>
                 {getDisplayStatus(enquiry.status)}
               </Badge>
-              
+
               {/* Status Update Dropdown - only show if not resolved */}
               {enquiry.status !== 'Resolved' && (
                 <Select onValueChange={handleStatusUpdate}>
@@ -332,7 +366,7 @@ export default function EnquiryDetailPage() {
                       {format(new Date(enquiry.enquiry_date), 'dd/MM/yyyy')}
                     </p>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Package className="h-4 w-4 text-slate-400" />
@@ -342,7 +376,7 @@ export default function EnquiryDetailPage() {
                       {enquiry.order_number}
                     </p>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <Building2 className="h-4 w-4 text-slate-400" />
@@ -352,7 +386,7 @@ export default function EnquiryDetailPage() {
                       {enquiry.platform}
                     </Badge>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <User className="h-4 w-4 text-slate-400" />
@@ -362,7 +396,7 @@ export default function EnquiryDetailPage() {
                       {enquiry.business_name}
                     </p>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <User className="h-4 w-4 text-slate-400" />
@@ -372,7 +406,7 @@ export default function EnquiryDetailPage() {
                       {enquiry.created_by_username}
                     </p>
                   </div>
-                  
+
                   <div className="space-y-2">
                     <span className="text-sm font-medium">Original Description:</span>
                     <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded border">
@@ -392,7 +426,7 @@ export default function EnquiryDetailPage() {
                     <span>Conversation</span>
                   </CardTitle>
                 </CardHeader>
-                
+
                 {/* Messages */}
                 <CardContent className="flex-1 overflow-y-auto space-y-4 p-4">
                   {enquiry.messages.map((message, index) => (
@@ -401,21 +435,18 @@ export default function EnquiryDetailPage() {
                       className={`flex ${isMyMessage(message) ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[70%] p-3 rounded-lg ${
-                          isMyMessage(message)
+                        className={`max-w-[70%] p-3 rounded-lg ${isMyMessage(message)
                             ? 'bg-blue-600 text-white'
                             : 'bg-slate-100 text-slate-900'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className={`text-xs font-medium ${
-                            isMyMessage(message) ? 'text-blue-100' : 'text-slate-600'
-                          }`}>
+                          <span className={`text-xs font-medium ${isMyMessage(message) ? 'text-blue-100' : 'text-slate-600'
+                            }`}>
                             {message.created_by_username}
                           </span>
-                          <div className={`flex items-center space-x-1 text-xs ${
-                            isMyMessage(message) ? 'text-blue-100' : 'text-slate-500'
-                          }`}>
+                          <div className={`flex items-center space-x-1 text-xs ${isMyMessage(message) ? 'text-blue-100' : 'text-slate-500'
+                            }`}>
                             <Clock className="h-3 w-3" />
                             <span>
                               {format(new Date(message.created_at), 'dd/MM/yy HH:mm')}
@@ -423,21 +454,20 @@ export default function EnquiryDetailPage() {
                           </div>
                         </div>
                         <p className="text-sm">{message.message}</p>
-                        
+
                         {/* Attachments */}
                         {message.attachments && message.attachments.length > 0 && (
                           <div className="mt-2 space-y-1">
                             {message.attachments.map((attachment: any, attIndex: number) => (
                               <div
                                 key={attIndex}
-                                className={`flex items-center space-x-2 text-xs p-2 rounded ${
-                                  isMyMessage(message) ? 'bg-blue-500' : 'bg-slate-200'
-                                }`}
+                                className={`flex items-center space-x-2 text-xs p-2 rounded ${isMyMessage(message) ? 'bg-blue-500' : 'bg-slate-200'
+                                  }`}
                               >
                                 <Paperclip className="h-3 w-3" />
                                 <span className="truncate">{attachment.originalName}</span>
-                                <Download 
-                                  className="h-3 w-3 cursor-pointer hover:text-blue-200" 
+                                <Download
+                                  className="h-3 w-3 cursor-pointer hover:text-blue-200"
                                   onClick={() => handleDownloadAttachment(attachment, message.id)}
                                 />
                               </div>
@@ -448,7 +478,7 @@ export default function EnquiryDetailPage() {
                     </div>
                   ))}
                 </CardContent>
-                
+
                 {/* Message Input */}
                 {enquiry.status !== 'Resolved' && (
                   <div className="p-4 border-t">
@@ -477,7 +507,7 @@ export default function EnquiryDetailPage() {
                         </div>
                       </div>
                     )}
-                    
+
                     <div className="flex space-x-2">
                       <div className="flex-1">
                         <Textarea
@@ -493,7 +523,7 @@ export default function EnquiryDetailPage() {
                           }}
                         />
                       </div>
-                      
+
                       <div className="flex flex-col space-y-2">
                         {/* File Upload Button */}
                         <div>
@@ -515,9 +545,9 @@ export default function EnquiryDetailPage() {
                             <Paperclip className="h-4 w-4" />
                           </Button>
                         </div>
-                        
+
                         {/* Send Button */}
-                        <Button 
+                        <Button
                           onClick={handleSendMessage}
                           disabled={(!newMessage.trim() && messageFiles.length === 0) || sending}
                           className="px-4"
@@ -534,6 +564,45 @@ export default function EnquiryDetailPage() {
               </Card>
             </div>
           </div>
+
+          <Dialog open={showStatusPrompt} onOpenChange={setShowStatusPrompt}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Update Enquiry Status?</DialogTitle>
+                <DialogDescription>
+                  You've sent a message. Would you like to update the status to notify the other team?
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="py-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">New Status</label>
+                  <Select
+                    value={proposedStatus}
+                    onValueChange={setProposedStatus}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Awaiting Business">Awaiting {businessName || 'Business'}</SelectItem>
+                      <SelectItem value="Awaiting Techezm">Awaiting Techezm</SelectItem>
+                      <SelectItem value="Resolved">Resolved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowStatusPrompt(false)}>
+                  No, keep as {enquiry.status}
+                </Button>
+                <Button onClick={confirmStatusUpdate}>
+                  Yes, Update Status
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </DashboardLayout>
     </ProtectedRoute>

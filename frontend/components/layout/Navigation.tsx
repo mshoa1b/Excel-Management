@@ -9,18 +9,20 @@ import { useNavigation } from '@/contexts/NavigationContext';
 import { clearAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { 
-  LayoutDashboard, 
-  FileSpreadsheet, 
-  BarChart3, 
-  Users, 
-  User, 
-  LogOut, 
-  Menu, 
+import {
+  LayoutDashboard,
+  FileSpreadsheet,
+  BarChart3,
+  Users,
+  User,
+  LogOut,
+  Menu,
   Settings,
   Settings2,
   MessageSquare
 } from 'lucide-react';
+
+import { NotificationBell } from '@/components/notifications/NotificationBell';
 
 export default function Navigation() {
   const { user } = useAuth();
@@ -38,10 +40,10 @@ export default function Navigation() {
     if (!user) return [];
 
     const baseItems = [
-      { 
-        href: `/dashboard/${user.role.name.toLowerCase().replace(' ', '-')}`, 
-        label: 'Dashboard', 
-        icon: LayoutDashboard 
+      {
+        href: `/dashboard/${user.role.name.toLowerCase().replace(' ', '-')}`,
+        label: 'Dashboard',
+        icon: LayoutDashboard
       },
     ];
 
@@ -73,24 +75,37 @@ export default function Navigation() {
 
   const navItems = getNavItems();
 
-  const NavContent = ({ showLabels = true }) => (
+  const NavContent = ({ showLabels = true, isMobile = false }) => (
     <div className="flex flex-col h-full">
-      <div className="flex-1">
+      <div className="flex-1 overflow-y-auto">
         <div className="px-4 py-6">
-          <div className={`flex items-center mb-8 ${showLabels ? 'justify-start' : 'justify-center'}`}>
+          <div className={`flex items-center mb-8 ${showLabels ? 'justify-between' : 'flex-col justify-center gap-4'}`}>
             {showLabels && (
-              <span className="text-lg font-bold text-slate-800">{businessName || 'Techezm'} RMA</span>
+              <span className="text-lg font-bold text-slate-800 truncate max-w-[140px]">{businessName || 'Techezm'} RMA</span>
+            )}
+
+            {!isMobile && (
+              <div className={`flex items-center ${showLabels ? 'gap-2' : 'flex-col-reverse gap-4'}`}>
+                <NotificationBell />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsNavCollapsed(!isNavCollapsed)}
+                  className="h-8 w-8"
+                >
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </div>
             )}
           </div>
-          
+
           <nav className="space-y-2">
             {navItems.map((item) => (
               <LoadingLink
                 key={item.href}
                 href={item.href}
-                className={`flex items-center rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 ${
-                  showLabels ? 'px-3 py-3 space-x-3' : 'px-2 py-4 justify-center'
-                }`}
+                className={`flex items-center rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 ${showLabels ? 'px-3 py-3 space-x-3' : 'px-2 py-4 justify-center'
+                  }`}
                 onClick={() => {
                   setIsOpen(false);
                   // Auto-collapse navbar after navigation (with small delay to show the loading state)
@@ -107,26 +122,13 @@ export default function Navigation() {
           </nav>
         </div>
       </div>
-      
+
       <div className="p-4 border-t border-slate-200">
-        <div className={`flex items-center px-3 py-3 mb-2 ${showLabels ? 'space-x-3' : 'justify-center'}`}>
-          <div className={`bg-slate-200 rounded-full flex items-center justify-center ${showLabels ? 'w-8 h-8' : 'w-12 h-12'}`}>
-            <User className={`${showLabels ? "h-4 w-4" : "h-8 w-8"} text-slate-600`} />
-          </div>
-          {showLabels && (
-            <div className="flex-1">
-              <p className="text-sm font-medium text-slate-800">{user?.username}</p>
-              <p className="text-xs text-slate-500">{user?.role.name}</p>
-            </div>
-          )}
-        </div>
-        
         <div className="space-y-2">
           <LoadingLink
             href="/profile"
-            className={`flex items-center rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 w-full ${
-              showLabels ? 'px-3 py-3 space-x-3' : 'px-2 py-4 justify-center'
-            }`}
+            className={`flex items-center rounded-lg text-slate-600 hover:text-blue-600 hover:bg-blue-50 transition-all duration-200 w-full ${showLabels ? 'px-3 py-3 space-x-3' : 'px-2 py-4 justify-center'
+              }`}
             onClick={() => {
               setIsOpen(false);
               // Auto-collapse navbar after navigation
@@ -139,13 +141,12 @@ export default function Navigation() {
             <User className={showLabels ? "h-4 w-4" : "h-8 w-8"} />
             {showLabels && <span className="text-sm font-medium">Profile</span>}
           </LoadingLink>
-          
+
           <Button
             variant="ghost"
             onClick={handleLogout}
-            className={`flex items-center rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 w-full transition-all duration-200 ${
-              showLabels ? 'px-3 py-3 space-x-3 justify-start' : 'px-2 py-4 justify-center'
-            }`}
+            className={`flex items-center rounded-lg text-slate-600 hover:text-red-600 hover:bg-red-50 w-full transition-all duration-200 ${showLabels ? 'px-3 py-3 space-x-3 justify-start' : 'px-2 py-4 justify-center'
+              }`}
             title={!showLabels ? 'Logout' : undefined}
           >
             <LogOut className={showLabels ? "h-4 w-4" : "h-8 w-8"} />
@@ -159,21 +160,8 @@ export default function Navigation() {
   return (
     <>
       {/* Desktop Navigation */}
-      <div className={`hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:bg-white lg:border-r lg:border-slate-200 transition-all duration-300 z-50 ${
-        isNavCollapsed ? 'lg:w-16' : 'lg:w-64'
-      }`}>
-        {/* Toggle Button inside navbar */}
-        <div className="absolute top-4 right-2 z-10">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsNavCollapsed(!isNavCollapsed)}
-            className="bg-white shadow-lg hover:shadow-xl transition-all duration-300 border-2"
-          >
-            <Menu className="h-4 w-4" />
-          </Button>
-        </div>
-        
+      <div className={`hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:bg-white lg:border-r lg:border-slate-200 transition-all duration-300 z-50 ${isNavCollapsed ? 'lg:w-16' : 'lg:w-64'
+        }`}>
         <NavContent showLabels={!isNavCollapsed} />
       </div>
 
@@ -184,20 +172,23 @@ export default function Navigation() {
             <div className="flex items-center">
               <span className="text-lg font-bold text-slate-800">{businessName || 'Techezm'} RMA</span>
             </div>
-            
-            <Sheet open={isOpen} onOpenChange={setIsOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <Menu className="h-6 w-6" />
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="p-0 w-64">
-                <NavContent showLabels={true} />
-              </SheetContent>
-            </Sheet>
+
+            <div className="flex items-center gap-2">
+              <NotificationBell />
+              <Sheet open={isOpen} onOpenChange={setIsOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="sm">
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="p-0 w-64">
+                  <NavContent showLabels={true} isMobile={true} />
+                </SheetContent>
+              </Sheet>
+            </div>
           </div>
         </div>
-        
+
         {/* Spacer for fixed header */}
         <div className="h-16" />
       </div>

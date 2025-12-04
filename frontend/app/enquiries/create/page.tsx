@@ -10,6 +10,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useAuth } from '@/hooks/useAuth';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { apiClient } from '@/lib/api';
@@ -22,7 +31,9 @@ export default function CreateEnquiryPage() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  
+  const [showModal, setShowModal] = useState(false);
+  const [notificationEnabled, setNotificationEnabled] = useState(true);
+
   // Pre-fill from URL parameters
   const [formData, setFormData] = useState({
     order_number: searchParams?.get('order_number') || '',
@@ -40,19 +51,28 @@ export default function CreateEnquiryPage() {
     }));
   }, [searchParams]);
 
-  const handleSubmit = async () => {
-    try {
-      if (!formData.order_number || !formData.platform || !formData.description || !formData.status) {
-        alert('Please fill in all required fields');
-        return;
-      }
+  const handleInitialSubmit = () => {
+    if (!formData.order_number || !formData.platform || !formData.description) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    setShowModal(true);
+  };
 
+  const handleConfirmCreate = async () => {
+    try {
       setLoading(true);
+      setShowModal(false);
+
+      let finalDescription = formData.description;
+      if (!notificationEnabled) {
+        finalDescription = `[SILENT] ${finalDescription}`;
+      }
 
       const enquiryData = {
         order_number: formData.order_number,
         platform: formData.platform,
-        description: formData.description,
+        description: finalDescription,
         status: formData.status,
         business_id: user?.business_id
       };
@@ -67,23 +87,17 @@ export default function CreateEnquiryPage() {
 
       // Handle file uploads if any
       if (selectedFiles.length > 0) {
-        console.log('Uploading files:', selectedFiles.length, selectedFiles);
         const formDataFiles = new FormData();
         selectedFiles.forEach(file => {
-          console.log('Appending file:', file.name, file.size, file.type);
           formDataFiles.append('files', file);
         });
         formDataFiles.append('enquiry_id', newEnquiry.id.toString());
 
         try {
-          console.log('Uploading files to:', `/enquiries/${newEnquiry.id}/attachments`);
-          console.log('FormData contents:', Array.from(formDataFiles.entries()));
-          
-          const response = await apiClient.request(`/enquiries/${newEnquiry.id}/attachments`, {
+          await apiClient.request(`/enquiries/${newEnquiry.id}/attachments`, {
             method: 'POST',
             body: formDataFiles
           });
-          console.log('Files uploaded successfully:', response);
         } catch (fileError) {
           console.error('File upload error:', fileError);
           alert('Enquiry created successfully, but file upload failed. You can add files from the enquiry details page.');
@@ -94,7 +108,7 @@ export default function CreateEnquiryPage() {
       router.push(`/enquiries/${newEnquiry.id}`);
     } catch (error: any) {
       console.error('Failed to create enquiry:', error);
-      
+
       if (error.status === 409) {
         // Enquiry already exists
         const response = await error.response?.json?.();
@@ -117,33 +131,31 @@ export default function CreateEnquiryPage() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    
-    console.log('Files selected:', files.map(f => ({ name: f.name, type: f.type, size: f.size })));
-    
+
     const validFiles: File[] = [];
     const rejectedFiles: string[] = [];
-    
+
     files.forEach(file => {
       // Check file size (10MB limit)
       if (file.size > 10 * 1024 * 1024) {
         rejectedFiles.push(`${file.name} (too large - max 10MB)`);
         return;
       }
-      
+
       // Check file type
-      if (file.type.startsWith('image/') || 
-          file.type === 'application/pdf' || 
-          file.type === 'text/plain') {
+      if (file.type.startsWith('image/') ||
+        file.type === 'application/pdf' ||
+        file.type === 'text/plain') {
         validFiles.push(file);
       } else {
         rejectedFiles.push(`${file.name} (unsupported type: ${file.type})`);
       }
     });
-    
+
     if (rejectedFiles.length > 0) {
       alert(`Some files were rejected:\n${rejectedFiles.join('\n')}\n\nOnly images, PDF, and text files under 10MB are allowed.`);
     }
-    
+
     setSelectedFiles(prev => [...prev, ...validFiles]);
   };
 
@@ -207,19 +219,6 @@ export default function CreateEnquiryPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status">Initial Status</Label>
-                <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select initial status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Awaiting Business">Awaiting {businessName || 'Business'}</SelectItem>
-                    <SelectItem value="Awaiting Techezm">Awaiting Techezm</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
                 <Label htmlFor="description">Description *</Label>
                 <Textarea
                   id="description"
@@ -233,7 +232,7 @@ export default function CreateEnquiryPage() {
                   {formData.description.length}/2000 characters
                 </p>
               </div>
-              
+
               {/* File Upload */}
               <div className="space-y-2">
                 <Label>Attachments (Optional)</Label>
@@ -252,7 +251,7 @@ export default function CreateEnquiryPage() {
                     <p className="text-xs text-slate-400">Images, PDF, and text files only (max 10MB each)</p>
                   </label>
                 </div>
-                
+
                 {selectedFiles.length > 0 && (
                   <div className="space-y-2">
                     <Label className="text-sm font-medium">Selected Files:</Label>
@@ -285,15 +284,60 @@ export default function CreateEnquiryPage() {
                   Cancel
                 </Button>
                 <Button
-                  onClick={handleSubmit}
+                  onClick={handleInitialSubmit}
                   disabled={loading || !formData.order_number || !formData.platform || !formData.description}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {loading ? 'Creating...' : 'Create Enquiry'}
+                  Create Enquiry
                 </Button>
               </div>
             </CardContent>
           </Card>
+
+          <Dialog open={showModal} onOpenChange={setShowModal}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Confirm Enquiry Creation</DialogTitle>
+                <DialogDescription>
+                  Please set the initial status and notification preferences.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="modal-status">Initial Status</Label>
+                  <Select
+                    value={formData.status}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}
+                  >
+                    <SelectTrigger id="modal-status">
+                      <SelectValue placeholder="Select initial status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Awaiting Business">Awaiting {businessName || 'Business'}</SelectItem>
+                      <SelectItem value="Awaiting Techezm">Awaiting Techezm</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="notification"
+                    checked={notificationEnabled}
+                    onCheckedChange={(checked) => setNotificationEnabled(checked as boolean)}
+                  />
+                  <Label htmlFor="notification">Send Notification to Team</Label>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setShowModal(false)}>Cancel</Button>
+                <Button onClick={handleConfirmCreate} disabled={loading}>
+                  {loading ? 'Creating...' : 'Confirm & Create'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </DashboardLayout>
     </ProtectedRoute>
