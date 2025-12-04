@@ -64,11 +64,11 @@ export interface SheetRecord {
 }
 
 const blockedByOptions = [
-  'Choose','','PIN Required','Code Required','Apple ID Required','Google ID Required',
-  'Awaiting Part','Awaiting Replacement','Awaiting Customer','Awaiting BM','Awaiting G&I','Awaiting Techezm'
+  'Choose', '', 'PIN Required', 'Code Required', 'Apple ID Required', 'Google ID Required',
+  'Awaiting Part', 'Awaiting Replacement', 'Awaiting Customer', 'Awaiting BM', 'Awaiting G&I', 'Awaiting Techezm'
 ];
-const lockedOptions = ['Choose','No','Google ID','Apple ID','PIN'];
-const oowOptions = ['Choose','No','Damaged','Wrong Device'];
+const lockedOptions = ['Choose', 'No', 'Google ID', 'Apple ID', 'PIN'];
+const oowOptions = ['Choose', 'No', 'Damaged', 'Wrong Device'];
 
 // Columns that should be multiline, fixed width
 const MULTILINE_COLS = ['customer_comment', 'additional_notes', 'cs_comment', 'manager_notes'];
@@ -76,19 +76,19 @@ const MULTILINE_COLS = ['customer_comment', 'additional_notes', 'cs_comment', 'm
 // Helpers
 const toYMD = (v: any): string => {
   if (!v || v === '') return '';
-  
+
   // Handle string dates
   if (typeof v === 'string') {
     // If already in YYYY-MM-DD format, return as-is
     if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
-    
+
     // Handle dd/MM/yyyy format (European style - our display format)
     if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(v)) {
       const [day, month, year] = v.split('/');
       const parsedDay = parseInt(day, 10);
       const parsedMonth = parseInt(month, 10);
       const parsedYear = parseInt(year, 10);
-      
+
       // Validate ranges
       if (parsedDay >= 1 && parsedDay <= 31 && parsedMonth >= 1 && parsedMonth <= 12) {
         const date = new Date(parsedYear, parsedMonth - 1, parsedDay);
@@ -97,18 +97,18 @@ const toYMD = (v: any): string => {
         }
       }
     }
-    
+
     const d = new Date(v);
     if (isNaN(d.getTime())) return '';
     return format(d, 'yyyy-MM-dd');
   }
-  
+
   // Handle Date objects
   if (v instanceof Date) {
     if (isNaN(v.getTime())) return '';
     return format(v, 'yyyy-MM-dd');
   }
-  
+
   // Try to parse other formats
   const d = new Date(v);
   if (isNaN(d.getTime())) return '';
@@ -165,7 +165,7 @@ const pickTextColor = (hex: string) => {
   const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!m) return '#111';
   const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
-  const lum = (0.2126*r + 0.7152*g + 0.0722*b) / 255;
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
   return lum > 0.6 ? '#111' : '#fff';
 };
 
@@ -192,9 +192,9 @@ const colorForRow = (r?: SheetRecord): string => {
       if (notEmpty(r.locked) && eq(r.locked, 'No') && !eq(r.locked, 'Choose')) return '#DC2626';
       if (notEmpty(r.oow_case) && !eq(r.oow_case, 'No') && !eq(r.locked, 'Choose')) return '#B45309';
 
-      
 
-      if (eq(r.return_type, 'refund')) {        
+
+      if (eq(r.return_type, 'refund')) {
         if ((!notEmpty(r.locked) || eq(r.locked, 'No')) && (!notEmpty(r.oow_case) || eq(r.oow_case, 'No')))
           return '#F97316';
       }
@@ -233,6 +233,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   });
   const [attachmentCounts, setAttachmentCounts] = useState<{ [sheetId: number]: number }>({});
   const [enquiryCounts, setEnquiryCounts] = useState<{ [orderNumber: string]: number }>({});
+  const [activeFilter, setActiveFilter] = useState<string | null>(null);
 
   // Enquiry handling functions
   const checkExistingEnquiry = async (orderNumber: string) => {
@@ -249,7 +250,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   const handleEnquiryAction = async (orderNumber: string, platform: string) => {
     try {
       const existingEnquiry = await checkExistingEnquiry(orderNumber);
-      
+
       if (existingEnquiry) {
         // Open existing enquiry in new tab
         window.open(`/enquiries/${existingEnquiry.id}`, '_blank');
@@ -273,12 +274,12 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     if (isLoadingEnquiryCounts.current) {
       return;
     }
-    
+
     isLoadingEnquiryCounts.current = true;
-    
+
     try {
       const orderNumbers = Array.from(new Set(sheets.map(sheet => sheet.order_no).filter(Boolean)));
-      
+
       if (orderNumbers.length === 0) {
         setEnquiryCounts({});
         return;
@@ -292,7 +293,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         },
         body: JSON.stringify({ order_numbers: orderNumbers })
       });
-      
+
       setEnquiryCounts(counts);
     } catch (error) {
       console.error('Error loading enquiry counts:', error);
@@ -308,7 +309,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     }
   }, []);
 
-  // Smart search and platform filtering
+  // Smart search, platform, and tile filtering
   useEffect(() => {
     const performFiltering = async () => {
       let dataToFilter = rowData;
@@ -322,11 +323,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           return orderNo.includes(searchLower) || customerName.includes(searchLower);
         });
 
-        // If found results in local data, use them
         if (localFiltered.length > 0) {
           dataToFilter = localFiltered;
         } else {
-          // If no local results, search the full database
           try {
             const searchResults = await searchSheets(businessId, searchTerm);
             const formatted = searchResults.map((row: any) => ({
@@ -343,7 +342,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             }));
             dataToFilter = formatted;
           } catch (error) {
-            dataToFilter = localFiltered; // Fall back to local results (empty)
+            dataToFilter = localFiltered;
           }
         }
       }
@@ -356,13 +355,60 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         });
       }
 
+      // Apply Tile/Legend Filter
+      if (activeFilter) {
+        dataToFilter = dataToFilter.filter(row => {
+          const status = (row.status || '').toLowerCase();
+          const blockedBy = (row.blocked_by || '').trim();
+          const isBlocked = blockedBy !== '' && blockedBy !== 'Choose';
+          const locked = (row.locked || '').trim();
+          const oow = (row.oow_case || '').trim();
+          const returnType = (row.return_type || '').toLowerCase();
+          const replacementAvailable = (row.replacement_available || '').toLowerCase();
+
+          switch (activeFilter) {
+            // Status Overview Filters
+            case 'Blocked':
+              return isBlocked;
+            case 'Actionable':
+              return !isBlocked && status !== 'resolved';
+            case 'Resolved':
+              return status === 'resolved';
+
+            // Legend Filters
+            case 'Legend_Resolved':
+              return status === 'resolved';
+            case 'Legend_Awaiting Customer/BM':
+              return isBlocked && (eq(blockedBy, 'Awaiting Customer') || eq(blockedBy, 'Awaiting BM'));
+            case 'Legend_Awaiting G&I':
+              return isBlocked && eq(blockedBy, 'Awaiting G&I');
+            case 'Legend_Awaiting Techezm':
+              return isBlocked && eq(blockedBy, 'Awaiting Techezm');
+            case 'Legend_Awaiting Replacement':
+              return isBlocked && eq(blockedBy, 'Awaiting Replacement');
+            case 'Legend_Blocked':
+              // Generic blocked (not one of the specific ones above)
+              return isBlocked && !['Awaiting Customer', 'Awaiting BM', 'Awaiting G&I', 'Awaiting Techezm', 'Awaiting Replacement'].some(x => eq(blockedBy, x));
+            case 'Legend_Locked':
+              return !isBlocked && status !== 'resolved' && notEmpty(locked) && eq(locked, 'No') && !eq(locked, 'Choose');
+            case 'Legend_OOW':
+              return !isBlocked && status !== 'resolved' && notEmpty(oow) && !eq(oow, 'No') && !eq(locked, 'Choose');
+            case 'Legend_Unresolved':
+              // Green default logic approximation
+              const color = colorForRow(row);
+              return color === '#22C55E';
+            default:
+              return true;
+          }
+        });
+      }
+
       setFilteredData(dataToFilter);
     };
 
-    // Debounce the search to avoid too many API calls
     const timeoutId = setTimeout(performFiltering, 300);
     return () => clearTimeout(timeoutId);
-  }, [rowData, searchTerm, platformFilter, businessId]);
+  }, [rowData, searchTerm, platformFilter, businessId, activeFilter]);
 
   // Prevent hover from overriding row colors
   useEffect(() => {
@@ -438,7 +484,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   // Load attachment counts for all sheets
   const loadAttachmentCounts = useCallback(async (sheets: SheetRecord[]) => {
     const counts: { [sheetId: number]: number } = {};
-    
+
     // Load attachment counts for each sheet
     await Promise.all(
       sheets.map(async (sheet) => {
@@ -450,7 +496,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         }
       })
     );
-    
+
     setAttachmentCounts(counts);
   }, []);
   // Load
@@ -458,24 +504,24 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     const data = await listSheets(businessId);
     const formatted: SheetRecord[] = Array.isArray(data)
       ? data.map((row: any) => ({
-          ...row,
-          id: Number(row.id),
-          business_id: Number(row.business_id),
-          refund_amount: Number(row.refund_amount ?? 0),
-          date_received: row.date_received ? toYMD(row.date_received) : '',
-          order_date: row.order_date ? toYMD(row.order_date) : '',
-          refund_date: row.refund_date ? toYMD(row.refund_date) : '',
-          return_within_30_days: !!row.return_within_30_days,
-          out_of_warranty: row.out_of_warranty || 'Choose',
-          updated_at: row.updated_at,
-        }))
+        ...row,
+        id: Number(row.id),
+        business_id: Number(row.business_id),
+        refund_amount: Number(row.refund_amount ?? 0),
+        date_received: row.date_received ? toYMD(row.date_received) : '',
+        order_date: row.order_date ? toYMD(row.order_date) : '',
+        refund_date: row.refund_date ? toYMD(row.refund_date) : '',
+        return_within_30_days: !!row.return_within_30_days,
+        out_of_warranty: row.out_of_warranty || 'Choose',
+        updated_at: row.updated_at,
+      }))
       : [];
     setRowData(formatted);
     recomputeTodayTotals(formatted);
-    
+
     // Load attachment counts
     loadAttachmentCounts(formatted);
-    
+
     // Load enquiry counts
     loadEnquiryCounts(formatted);
 
@@ -485,9 +531,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     }, 0);
   }, [businessId, autoSizeNonMultiline, reflowAutoHeight, recomputeTodayTotals]);
 
-  useEffect(() => { 
+  useEffect(() => {
     loadStaffOptions();
-    refresh(); 
+    refresh();
   }, [loadStaffOptions, refresh]);
 
   // Date range filtering
@@ -508,7 +554,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         out_of_warranty: row.out_of_warranty || 'Choose',
         updated_at: row.updated_at,
       }));
-      
+
       setRowData(formatted);
       setIsDateFiltered(true);
       recomputeTodayTotals(formatted);
@@ -587,7 +633,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   const removeSelected = () => {
     const rows = apiRef.current?.getSelectedRows() || [];
     if (!rows.length) return;
-    
+
     const rowIds = rows.map(r => r.id).filter(Boolean) as number[];
     setSelectedRowsForDeletion(rowIds);
     setBulkDeleteConfirmOpen(true);
@@ -694,7 +740,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     if (p.newValue == null || p.newValue === '') {
       return '';
     }
-    
+
     // Try to parse the new value and return it (toYMD already handles invalid dates by returning '')
     return toYMD(p.newValue);
   };
@@ -711,16 +757,20 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       { headerName: 'Blocked By', field: 'blocked_by', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: blockedByOptions }, minWidth: 120, pinned: 'left' },
       { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, minWidth: 120, hide: true },
 
-      { headerName: 'Date Received', field: 'date_received', editable: true, 
+      {
+        headerName: 'Date Received', field: 'date_received', editable: true,
         cellEditor: 'agDateStringCellEditor',
-        valueFormatter: dateFormatter, 
+        valueFormatter: dateFormatter,
         valueParser: dateParser,
-        minWidth: 130 },
-      { headerName: 'Order Date', field: 'order_date', editable: true, 
+        minWidth: 130
+      },
+      {
+        headerName: 'Order Date', field: 'order_date', editable: true,
         cellEditor: 'agDateStringCellEditor',
-        valueFormatter: dateFormatter, 
+        valueFormatter: dateFormatter,
         valueParser: dateParser,
-        minWidth: 120 },
+        minWidth: 120
+      },
 
       { headerName: 'Customer Name', field: 'customer_name', editable: true, minWidth: 140 },
       { headerName: 'IMEI', field: 'imei', editable: true, minWidth: 130 },
@@ -730,40 +780,44 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       { headerName: 'Customer Comment', field: 'customer_comment', editable: true, cellEditor: 'agLargeTextCellEditor', cellEditorParams: { maxLength: 500, rows: 4 }, wrapText: true, autoHeight: true, width: 260 },
       { headerName: 'CS Comment', field: 'cs_comment', editable: true, wrapText: true, autoHeight: true, width: 260 },
 
-      { headerName: 'Multiple Return', field: 'multiple_return', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','No','2nd Time','3rd Time'] }, minWidth: 130 },
-      { headerName: 'Apple/Google ID', field: 'apple_google_id', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Yes','Yes-Issue raised','No'] }, minWidth: 150, hide: true },
-      { headerName: 'Return Type', field: 'return_type', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Refund','URGENT REPAIR','Replacement','Repair','Faulty','Other'] }, minWidth: 130 },
+      { headerName: 'Multiple Return', field: 'multiple_return', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'No', '2nd Time', '3rd Time'] }, minWidth: 130 },
+      { headerName: 'Apple/Google ID', field: 'apple_google_id', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'Yes', 'Yes-Issue raised', 'No'] }, minWidth: 150, hide: true },
+      { headerName: 'Return Type', field: 'return_type', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'Refund', 'URGENT REPAIR', 'Replacement', 'Repair', 'Faulty', 'Other'] }, minWidth: 130 },
 
       { headerName: 'Locked', field: 'locked', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: lockedOptions }, minWidth: 120 },
       { headerName: 'OOW Case', field: 'oow_case', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: oowOptions }, minWidth: 120 },
 
-      { headerName: 'Replacement Available', field: 'replacement_available', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Yes','No'] }, minWidth: 170 },
+      { headerName: 'Replacement Available', field: 'replacement_available', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'Yes', 'No'] }, minWidth: 170 },
       { headerName: 'Done By', field: 'done_by', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: staffOptions }, minWidth: 110 },
 
-      { headerName: 'Resolution', field: 'resolution', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Back in stock','Sent repaired back to customer','Sent back to customer','Sent replacement','Sent back to supplier','BER'] }, minWidth: 160 },
+      { headerName: 'Resolution', field: 'resolution', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'Back in stock', 'Sent repaired back to customer', 'Sent back to customer', 'Sent replacement', 'Sent back to supplier', 'BER'] }, minWidth: 160 },
 
       { headerName: 'Refund Amount', field: 'refund_amount', editable: true, valueFormatter: (p) => typeof p.value === 'number' ? formatCurrency(p.value) : formatCurrency(0), valueParser: numberParser, minWidth: 130 },
 
-      { headerName: 'Refund Date', field: 'refund_date', editable: true, 
+      {
+        headerName: 'Refund Date', field: 'refund_date', editable: true,
         cellEditor: 'agDateStringCellEditor',
-        valueFormatter: dateFormatter, 
+        valueFormatter: dateFormatter,
         valueParser: dateParser,
-        minWidth: 120 },
+        minWidth: 120
+      },
 
       { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: true, minWidth: 160 },
       { headerName: 'Platform', field: 'platform', editable: false, valueGetter: p => computePlatform(p.data?.order_no ?? ''), minWidth: 110 },
       { headerName: 'Return within 30 days', field: 'return_within_30_days', editable: false, valueGetter: p => computeWithin30(p.data?.date_received ?? '', p.data?.order_date ?? ''), minWidth: 180 },
 
-      { headerName: 'Issue', field: 'issue', editable: true, cellEditor: 'agSelectCellEditor',
-        cellEditorParams: { values: ['Choose','Battery','board','Body issue','bought wrong device','Buttons','Camera','Change of mind','Charging','Charging Port','Cosmetic','Damage in transit','GPS','IC','Language','Lcd','Mic','Network','Overheating','OW','Screen','Software','Speaker','Wrong product','No issue','Other'] },
-        minWidth: 160 },
+      {
+        headerName: 'Issue', field: 'issue', editable: true, cellEditor: 'agSelectCellEditor',
+        cellEditorParams: { values: ['Choose', 'Battery', 'board', 'Body issue', 'bought wrong device', 'Buttons', 'Camera', 'Change of mind', 'Charging', 'Charging Port', 'Cosmetic', 'Damage in transit', 'GPS', 'IC', 'Language', 'Lcd', 'Mic', 'Network', 'Overheating', 'OW', 'Screen', 'Software', 'Speaker', 'Wrong product', 'No issue', 'Other'] },
+        minWidth: 160
+      },
 
-      { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose','Yes','No'] }, minWidth: 140 },
+      { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'Yes', 'No'] }, minWidth: 140 },
 
       // Multiline, fixed width
       { headerName: 'Additional Notes', field: 'additional_notes', editable: true, wrapText: true, autoHeight: true, width: 260 },
 
-      { headerName: 'Status', field: 'status', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Pending','In Progress','Resolved'] }, minWidth: 120 },
+      { headerName: 'Status', field: 'status', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Pending', 'In Progress', 'Resolved'] }, minWidth: 120 },
       { headerName: 'Manager Notes', field: 'manager_notes', editable: true, wrapText: true, autoHeight: true, width: 260 },
 
       { headerName: 'Last Updated', field: 'updated_at', editable: false, minWidth: 150, valueFormatter: (p) => p.value ? format(new Date(p.value), 'dd-MM-yyyy HH:mm') : '' },
@@ -776,11 +830,11 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           const orderNumber = p.data?.order_no;
           const platform = computePlatform(p.data);
           const hasEnquiry = enquiryCounts[orderNumber] > 0;
-          
+
           return (
             <div className="flex justify-end gap-1 pr-1">
-              <AttachmentManager 
-                sheetId={p.data?.id} 
+              <AttachmentManager
+                sheetId={p.data?.id}
                 attachmentCount={attachmentCounts[p.data?.id] || 0}
                 returnId={buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0)}
                 onAttachmentChange={() => {
@@ -798,9 +852,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                 }}
               />
               <button
-                className={`rounded-md px-2 py-1 text-white group-hover:text-black hover:bg-gray-100 ${
-                  hasEnquiry ? 'bg-blue-500' : 'bg-gray-400'
-                }`}
+                className={`rounded-md px-2 py-1 text-white group-hover:text-black hover:bg-gray-100 ${hasEnquiry ? 'bg-blue-500' : 'bg-gray-400'
+                  }`}
                 onClick={() => orderNumber && handleEnquiryAction(orderNumber, platform)}
                 title={hasEnquiry ? 'View existing enquiry' : 'Create new enquiry'}
                 disabled={!orderNumber}
@@ -840,9 +893,13 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     if (e.finished) reflowAutoHeight();
   }, [reflowAutoHeight]);
 
+  const toggleFilter = (filterName: string) => {
+    setActiveFilter(prev => prev === filterName ? null : filterName);
+  };
+
   // Calculate status stats based on filtered data
   const statusStats = useMemo(() => {
-    const blocked = filteredData.filter(row => 
+    const blocked = filteredData.filter(row =>
       row.blocked_by && row.blocked_by.trim() !== '' && row.blocked_by !== 'Choose'
     ).length;
 
@@ -852,7 +909,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       return !isBlocked && isNotResolved;
     }).length;
 
-    const resolved = filteredData.filter(row => 
+    const resolved = filteredData.filter(row =>
       row.status && row.status.toLowerCase() === 'resolved'
     ).length;
 
@@ -861,6 +918,10 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
     return { blocked, unresolved, resolved, total, actionable };
   }, [filteredData]);
+
+
+
+
 
   return (
     <div className="flex flex-col space-y-3 p-4 bg-white rounded-lg shadow-md">
@@ -893,7 +954,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               </Button>
             )}
           </div>
-          
+
           {/* Platform Filter */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground font-medium">Platform:</span>
@@ -909,7 +970,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             </Select>
           </div>
         </div>
-        
+
         {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -926,20 +987,32 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       <div className="mb-2 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-sm font-semibold text-gray-700">Status Overview</h3>
-          <span className="text-xs text-gray-500">Updates with filters</span>
+          <span className="text-xs text-gray-500">Click tiles to filter</span>
         </div>
         <div className="flex flex-wrap gap-3">
-          <div className="flex items-center gap-2 bg-red-50 px-3 py-2 rounded-md shadow-sm border border-red-100">
+          <div
+            onClick={() => toggleFilter('Blocked')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-md shadow-sm border cursor-pointer transition-all ${activeFilter === 'Blocked' ? 'ring-2 ring-red-500 ring-offset-1 bg-red-100' : 'bg-red-50 border-red-100 hover:bg-red-100'
+              }`}
+          >
             <div className="w-3 h-3 bg-red-500 rounded-full"></div>
             <span className="text-red-700 font-medium text-sm">Blocked:</span>
             <span className="text-lg font-bold text-red-800">{statusStats.blocked}</span>
           </div>
-          <div className="flex items-center gap-2 bg-yellow-50 px-3 py-2 rounded-md shadow-sm border border-yellow-100">
+          <div
+            onClick={() => toggleFilter('Actionable')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-md shadow-sm border cursor-pointer transition-all ${activeFilter === 'Actionable' ? 'ring-2 ring-yellow-500 ring-offset-1 bg-yellow-100' : 'bg-yellow-50 border-yellow-100 hover:bg-yellow-100'
+              }`}
+          >
             <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
             <span className="text-yellow-700 font-medium text-sm">Actionable:</span>
             <span className="text-lg font-bold text-yellow-800">{statusStats.actionable}</span>
           </div>
-          <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-md shadow-sm border border-green-100">
+          <div
+            onClick={() => toggleFilter('Resolved')}
+            className={`flex items-center gap-2 px-3 py-2 rounded-md shadow-sm border cursor-pointer transition-all ${activeFilter === 'Resolved' ? 'ring-2 ring-green-500 ring-offset-1 bg-green-100' : 'bg-green-50 border-green-100 hover:bg-green-100'
+              }`}
+          >
             <div className="w-3 h-3 bg-green-500 rounded-full"></div>
             <span className="text-green-700 font-medium text-sm">Resolved:</span>
             <span className="text-lg font-bold text-green-800">{statusStats.resolved}</span>
@@ -984,21 +1057,28 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         </div>
       </div>
 
-      {/* Optional legend */}
+      {/* Interactive Legend */}
       <div className="flex flex-wrap gap-2 text-xs mb-2">
         {[
-          ['#166534','Resolved'],
-          ['#F59E0B','Awaiting Customer/BM'],
-          ['#1D4ED8','Awaiting G&I'],
-          ['#F97316','Awaiting Techezm'],
-          ['#DB2777','Awaiting Replacement'],
-          ['#6B7280','Blocked'],
-          ['#DC2626','Locked'],
-          ['#B45309','OOW'],
-          ['#22C55E','Unresolved'],
-        ].map(([hex,label])=>(
-          <div key={hex} className="flex items-center gap-2 px-2 py-1 rounded border">
-            <span style={{backgroundColor: hex, width: 14, height: 14, borderRadius: 3}} />
+          ['#166534', 'Resolved', 'Legend_Resolved'],
+          ['#F59E0B', 'Awaiting Customer/BM', 'Legend_Awaiting Customer/BM'],
+          ['#1D4ED8', 'Awaiting G&I', 'Legend_Awaiting G&I'],
+          ['#F97316', 'Awaiting Techezm', 'Legend_Awaiting Techezm'],
+          ['#DB2777', 'Awaiting Replacement', 'Legend_Awaiting Replacement'],
+          ['#6B7280', 'Blocked', 'Legend_Blocked'],
+          ['#DC2626', 'Locked', 'Legend_Locked'],
+          ['#B45309', 'OOW', 'Legend_OOW'],
+          ['#22C55E', 'Unresolved', 'Legend_Unresolved'],
+        ].map(([hex, label, filterKey]) => (
+          <div
+            key={hex}
+            onClick={() => toggleFilter(filterKey)}
+            className={`flex items-center gap-2 px-2 py-1 rounded border cursor-pointer transition-all ${activeFilter === filterKey
+              ? 'ring-2 ring-offset-1 ring-gray-400 bg-gray-100'
+              : 'hover:bg-gray-50'
+              }`}
+          >
+            <span style={{ backgroundColor: hex, width: 14, height: 14, borderRadius: 3 }} />
             <span>{label}</span>
           </div>
         ))}
@@ -1017,6 +1097,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           onFirstDataRendered={onFirstDataRendered}
           onGridSizeChanged={onGridSizeChanged}
           onColumnResized={onColumnResized}
+          pagination={true}
+          paginationPageSize={20}
+          paginationPageSizeSelector={[20, 50, 100]}
           defaultColDef={{
             sortable: true,
             resizable: true,

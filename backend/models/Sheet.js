@@ -76,18 +76,52 @@ const createSheet = async (sheet) => {
 
 // ---------------- UPDATE SHEET ----------------
 const updateSheet = async (sheet) => {
+  const { id, business_id } = sheet;
+
+  if (!id || !business_id) {
+    throw new Error("id and business_id are required for update");
+  }
+
+  // 1. Fetch current data to ensure we don't overwrite with nulls/old data
+  const currentRes = await pool.query(
+    'SELECT * FROM sheets WHERE id=$1 AND business_id=$2',
+    [id, business_id]
+  );
+
+  if (currentRes.rowCount === 0) {
+    throw new Error("Sheet not found");
+  }
+
+  const current = currentRes.rows[0];
+
+  // 2. Merge incoming data with current data
+  // We only use fields that are present in the 'sheet' object.
+  // If a field is missing in 'sheet', we keep 'current' value.
+  const merged = { ...current, ...sheet };
+
   const {
-    id, business_id, date_received, order_no, order_date, customer_name, imei, sku,
+    date_received, order_no, order_date, customer_name, imei, sku,
     customer_comment, multiple_return, apple_google_id, return_type, locked, oow_case,
     replacement_available, done_by, blocked_by, cs_comment, resolution,
     refund_amount, refund_date, return_tracking_no, issue, out_of_warranty,
     additional_notes, status, manager_notes
-  } = sheet;
+  } = merged;
 
+  // 3. Recalculate derived fields based on MERGED data
   const platform = /^\d{8}$/.test(order_no) ? 'Back Market' : 'Amazon';
-  const return_within_30_days = (date_received && order_date)
-    ? Math.floor((new Date(date_received) - new Date(order_date)) / (1000*60*60*24)) <= 30 ? 'Yes' : 'No'
-    : 'No';
+  
+  let return_within_30_days = 'No';
+  if (date_received && order_date) {
+     try {
+       const d1 = new Date(date_received);
+       const d2 = new Date(order_date);
+       if (!isNaN(d1) && !isNaN(d2)) {
+         const diffTime = Math.abs(d1 - d2);
+         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+         return_within_30_days = diffDays <= 30 ? 'Yes' : 'No';
+       }
+     } catch (e) { /* ignore */ }
+  }
 
   // Convert empty strings to null for date fields to prevent PostgreSQL errors
   const safeDateReceived = date_received === '' ? null : date_received;
