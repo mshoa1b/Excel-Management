@@ -1098,7 +1098,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           onGridSizeChanged={onGridSizeChanged}
           onColumnResized={onColumnResized}
           pagination={true}
-          paginationPageSize={20}
+          paginationPageSize={50}
           paginationPageSizeSelector={[20, 50, 100]}
           defaultColDef={{
             sortable: true,
