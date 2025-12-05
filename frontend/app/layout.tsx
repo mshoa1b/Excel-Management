@@ -4,6 +4,7 @@ import { LoadingProvider } from '@/contexts/LoadingContext';
 import { BusinessProvider } from '@/contexts/BusinessContext';
 import { NavigationProvider } from '@/contexts/NavigationContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 
 export const metadata: Metadata = {
   title: 'Techezm RMA',
@@ -28,7 +29,9 @@ export default function RootLayout({
           <LoadingProvider>
             <BusinessProvider>
               <NavigationProvider>
-                {children}
+                <NotificationProvider>
+                  {children}
+                </NotificationProvider>
               </NavigationProvider>
             </BusinessProvider>
           </LoadingProvider>
