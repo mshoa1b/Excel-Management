@@ -3,6 +3,8 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { apiClient } from '@/lib/api';
+import { showBrowserNotification, requestNotificationPermission } from '@/lib/browserNotification';
+import { useRouter } from 'next/navigation';
 
 export interface NotificationItem {
     id: string;
@@ -26,9 +28,11 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
     const { user } = useAuth();
+    const router = useRouter();
     const [notifications, setNotifications] = useState<NotificationItem[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const lastPolledAt = useRef<Date>(new Date());
+    const previousNotifications = useRef<NotificationItem[]>([]);
 
     // Load from local storage on mount
     useEffect(() => {
@@ -44,11 +48,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
 
         // Request notification permission
-        if (typeof window !== 'undefined' && 'Notification' in window) {
-            if (Notification.permission === 'default') {
-                Notification.requestPermission();
-            }
-        }
+        requestNotificationPermission();
     }, []);
 
     // Save to local storage whenever notifications change
@@ -64,8 +64,41 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const fetchNotifications = async () => {
             try {
                 const data = await apiClient.getNotifications();
-                // Merge with local state to avoid flickering if possible, or just replace
-                // For simplicity, replacing:
+
+                // Detect new notifications by comparing with previous state
+                if (previousNotifications.current.length > 0) {
+                    const previousIds = new Set(previousNotifications.current.map(n => n.id));
+                    const newNotifications = data.filter((n: NotificationItem) =>
+                        !previousIds.has(n.id) && !n.read
+                    );
+
+                    console.log('🔔 Checking for new notifications...', {
+                        previousCount: previousNotifications.current.length,
+                        currentCount: data.length,
+                        newCount: newNotifications.length
+                    });
+
+                    // Show browser notifications for new unread notifications
+                    for (const notification of newNotifications) {
+                        console.log('🔔 Triggering browser notification:', notification.title);
+                        showBrowserNotification({
+                            title: notification.title,
+                            body: notification.message,
+                            tag: notification.id,
+                            data: { link: notification.link },
+                            onClick: () => {
+                                if (notification.link) {
+                                    router.push(notification.link);
+                                }
+                            }
+                        });
+                    }
+                } else {
+                    console.log('🔔 First notification fetch - no browser notifications triggered');
+                }
+
+                // Update state
+                previousNotifications.current = data;
                 setNotifications(data);
                 setUnreadCount(data.filter((n: NotificationItem) => !n.read).length);
             } catch (error) {
@@ -77,7 +110,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const intervalId = setInterval(fetchNotifications, 60000); // 60 seconds
 
         return () => clearInterval(intervalId);
-    }, [user]);
+    }, [user, router]);
 
     const markAsRead = async (id: string) => {
         try {

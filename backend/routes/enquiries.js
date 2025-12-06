@@ -25,11 +25,11 @@ const upload = multer({
       mimetype: file.mimetype,
       size: file.size
     });
-    
+
     // More permissive image type checking
-    if (file.mimetype.startsWith('image/') || 
-        file.mimetype === 'application/pdf' || 
-        file.mimetype === 'text/plain') {
+    if (file.mimetype.startsWith('image/') ||
+      file.mimetype === 'application/pdf' ||
+      file.mimetype === 'text/plain') {
       cb(null, true);
     } else {
       console.log('File rejected due to unsupported MIME type:', file.mimetype);
@@ -55,45 +55,45 @@ router.get("/", authenticateToken, async (req, res) => {
       LEFT JOIN businesses b ON e.business_id = b.id
       LEFT JOIN users u ON e.created_by = u.id
     `;
-    
+
     let conditions = [];
     let params = [];
     let paramIndex = 1;
-    
+
     // Business access filter
     if (myRole !== ROLE.SUPER_ADMIN) {
       conditions.push(`e.business_id = $${paramIndex}`);
       params.push(myBiz);
       paramIndex++;
     }
-    
+
     // Order number search (case-insensitive partial match)
     if (order_number && order_number.trim()) {
       conditions.push(`LOWER(e.order_number) LIKE LOWER($${paramIndex})`);
       params.push(`%${order_number.trim()}%`);
       paramIndex++;
     }
-    
+
     // Date range filter
     if (date_from) {
       conditions.push(`e.enquiry_date >= $${paramIndex}`);
       params.push(date_from);
       paramIndex++;
     }
-    
+
     if (date_to) {
       conditions.push(`e.enquiry_date <= $${paramIndex}`);
       params.push(date_to);
       paramIndex++;
     }
-    
+
     // Platform filter
     if (platform && platform !== 'all') {
       conditions.push(`e.platform = $${paramIndex}`);
       params.push(platform);
       paramIndex++;
     }
-    
+
     // Status filter
     if (status_filter && status_filter !== 'all') {
       if (status_filter === 'active') {
@@ -110,17 +110,17 @@ router.get("/", authenticateToken, async (req, res) => {
       // Default behavior: exclude old resolved enquiries
       conditions.push(`(e.status != 'Resolved' OR (e.status = 'Resolved' AND e.updated_at >= NOW() - INTERVAL '5 days'))`);
     }
-    
+
     // Add WHERE clause if there are conditions
     if (conditions.length > 0) {
       query += ` WHERE ${conditions.join(' AND ')}`;
     }
-    
+
     // Order by creation date (newest first)
     query += " ORDER BY e.created_at DESC";
 
-    console.log('Enquiries query:', query);
-    console.log('Query params:', params);
+    //console.log('Enquiries query:', query);
+    //console.log('Query params:', params);
 
     const { rows } = await pool.query(query, params);
     res.json(rows);
@@ -149,9 +149,9 @@ router.get("/:id", authenticateToken, async (req, res) => {
       LEFT JOIN users u ON e.created_by = u.id
       WHERE e.id = $1
     `;
-    
+
     let params = [enquiryId];
-    
+
     // If not superadmin, ensure they can only see their business enquiries
     if (myRole !== ROLE.SUPER_ADMIN) {
       enquiryQuery += " AND e.business_id = $2";
@@ -159,7 +159,7 @@ router.get("/:id", authenticateToken, async (req, res) => {
     }
 
     const { rows: enquiryRows } = await pool.query(enquiryQuery, params);
-    
+
     if (enquiryRows.length === 0) {
       return res.status(404).json({ message: "Enquiry not found" });
     }
@@ -236,13 +236,13 @@ router.post("/", authenticateToken, async (req, res) => {
       WHERE order_number = $1 AND business_id = $2
       LIMIT 1
     `;
-    
+
     console.log('Checking for existing enquiry:', { order_number, targetBusinessId });
     const existingResult = await pool.query(existingEnquiryQuery, [order_number, targetBusinessId]);
-    
+
     if (existingResult.rows.length > 0) {
       console.log('Found existing enquiry:', existingResult.rows[0]);
-      return res.status(409).json({ 
+      return res.status(409).json({
         error: 'Enquiry already exists for this order number',
         existingEnquiryId: existingResult.rows[0].id
       });
@@ -281,10 +281,10 @@ router.post("/", authenticateToken, async (req, res) => {
     // Usually Business User creates enquiry -> Notify CS
     // If CS creates enquiry (?) -> Notify Business
     await notifyUsers(
-      targetBusinessId, 
-      req.user.username, 
-      'info', 
-      `New Enquiry: ${order_number}`, 
+      targetBusinessId,
+      req.user.username,
+      'info',
+      `New Enquiry: ${order_number}`,
       `New enquiry created by ${req.user.username}`,
       `/enquiries/${rows[0].id}`
     );
@@ -314,14 +314,14 @@ router.post("/:id/messages", authenticateToken, upload.array('files', 5), async 
     // Verify user has access to this enquiry
     let checkQuery = "SELECT id, business_id, status, order_number FROM enquiries WHERE id = $1";
     let checkParams = [enquiryId];
-    
+
     if (myRole !== ROLE.SUPER_ADMIN) {
       checkQuery += " AND business_id = $2";
       checkParams.push(myBiz);
     }
 
     const { rows: enquiryRows } = await pool.query(checkQuery, checkParams);
-    
+
     if (enquiryRows.length === 0) {
       return res.status(404).json({ message: "Enquiry not found" });
     }
@@ -332,17 +332,17 @@ router.post("/:id/messages", authenticateToken, upload.array('files', 5), async 
     let attachments = null;
     if (files.length > 0) {
       attachments = [];
-      
+
       for (const file of files) {
         try {
           console.log('Processing message file:', file.originalname, 'Size:', file.size);
-          
+
           // Generate unique filename
           const fileExtension = path.extname(file.originalname);
           const timestamp = Date.now();
           const randomString = crypto.randomBytes(6).toString('hex');
           const filename = `message_${timestamp}_${randomString}${fileExtension}`;
-          
+
           console.log('Generated filename for message:', filename);
 
           // Upload to SFTP (use enquiryId as sheetId for folder organization)
@@ -380,8 +380,8 @@ router.post("/:id/messages", authenticateToken, upload.array('files', 5), async 
 
     const messageText = message?.trim() || (files.length > 0 ? `Sent ${files.length} file(s)` : '');
     const { rows: messageRows } = await pool.query(messageQuery, [
-      enquiryId, 
-      messageText, 
+      enquiryId,
+      messageText,
       attachments ? JSON.stringify(attachments) : null,
       createdBy
     ]);
@@ -401,16 +401,16 @@ router.post("/:id/messages", authenticateToken, upload.array('files', 5), async 
 
 
     // Notify relevant users
-    console.log('DEBUG NOTIFICATION: enquiry=', enquiry);
-    console.log('DEBUG NOTIFICATION: updatedEnquiry=', updatedEnquiry[0]);
+    //console.log('DEBUG NOTIFICATION: enquiry=', enquiry);
+    //console.log('DEBUG NOTIFICATION: updatedEnquiry=', updatedEnquiry[0]);
 
     const orderNo = updatedEnquiry[0]?.order_number || enquiry.order_number || 'Unknown Order';
 
     await notifyUsers(
-      enquiry.business_id, 
-      req.user.username, 
-      'info', 
-      `New Reply: ${orderNo}`, 
+      enquiry.business_id,
+      req.user.username,
+      'info',
+      `New Reply: ${orderNo}`,
       `New reply from ${req.user.username}`,
       `/enquiries/${enquiryId}`
     );
@@ -437,14 +437,14 @@ router.put("/:id/status", authenticateToken, async (req, res) => {
     // Verify user has access to this enquiry
     let checkQuery = "SELECT id, business_id FROM enquiries WHERE id = $1";
     let checkParams = [enquiryId];
-    
+
     if (myRole !== ROLE.SUPER_ADMIN) {
       checkQuery += " AND business_id = $2";
       checkParams.push(myBiz);
     }
 
     const { rows: enquiryRows } = await pool.query(checkQuery, checkParams);
-    
+
     if (enquiryRows.length === 0) {
       return res.status(404).json({ message: "Enquiry not found" });
     }
@@ -469,7 +469,7 @@ router.put("/:id/status", authenticateToken, async (req, res) => {
 // POST /api/enquiries/:id/attachments - Upload files for enquiry
 router.post("/:id/attachments", authenticateToken, upload.array('files', 5), async (req, res) => {
   console.log('Enquiry attachment upload endpoint hit');
-  
+
   try {
     const enquiryId = parseInt(req.params.id);
     const myRole = req.user?.role_id;
@@ -478,10 +478,10 @@ router.post("/:id/attachments", authenticateToken, upload.array('files', 5), asy
     console.log('Attachment upload request:', {
       enquiryId,
       filesCount: req.files ? req.files.length : 0,
-      files: req.files ? req.files.map(f => ({ 
-        originalname: f.originalname, 
-        mimetype: f.mimetype, 
-        size: f.size 
+      files: req.files ? req.files.map(f => ({
+        originalname: f.originalname,
+        mimetype: f.mimetype,
+        size: f.size
       })) : [],
       body: req.body,
       user: { id: req.user.id, role: myRole, business: myBiz }
@@ -495,31 +495,31 @@ router.post("/:id/attachments", authenticateToken, upload.array('files', 5), asy
     // Verify user has access to this enquiry
     let checkQuery = "SELECT id, business_id FROM enquiries WHERE id = $1";
     let checkParams = [enquiryId];
-    
+
     if (myRole !== ROLE.SUPER_ADMIN) {
       checkQuery += " AND business_id = $2";
       checkParams.push(myBiz);
     }
 
     const { rows: enquiryRows } = await pool.query(checkQuery, checkParams);
-    
+
     if (enquiryRows.length === 0) {
       return res.status(404).json({ message: "Enquiry not found" });
     }
 
     // Upload files to SFTP and store metadata
     const fileMetadata = [];
-    
+
     for (const file of req.files) {
       try {
         console.log('Processing enquiry file:', file.originalname, 'Size:', file.size);
-        
+
         // Generate unique filename
         const fileExtension = path.extname(file.originalname);
         const timestamp = Date.now();
         const randomString = crypto.randomBytes(6).toString('hex');
         const filename = `enquiry_${timestamp}_${randomString}${fileExtension}`;
-        
+
         console.log('Generated filename for enquiry:', filename);
 
         // Upload to SFTP (use enquiryId as a pseudo-sheetId for folder organization)
@@ -587,14 +587,14 @@ router.get("/:id/attachments/:filename/download", authenticateToken, async (req,
     // Verify user has access to this enquiry
     let checkQuery = "SELECT id, business_id FROM enquiries WHERE id = $1";
     let checkParams = [enquiryId];
-    
+
     if (myRole !== ROLE.SUPER_ADMIN) {
       checkQuery += " AND business_id = $2";
       checkParams.push(myBiz);
     }
 
     const { rows: enquiryRows } = await pool.query(checkQuery, checkParams);
-    
+
     if (enquiryRows.length === 0) {
       return res.status(404).json({ message: "Enquiry not found" });
     }
@@ -604,9 +604,9 @@ router.get("/:id/attachments/:filename/download", authenticateToken, async (req,
       SELECT attachments FROM enquiry_messages 
       WHERE enquiry_id = $1 AND attachments::text LIKE $2
     `;
-    
+
     const { rows: messageRows } = await pool.query(messageQuery, [
-      enquiryId, 
+      enquiryId,
       `%"filename":"${filename}"%`
     ]);
 
@@ -628,7 +628,7 @@ router.get("/:id/attachments/:filename/download", authenticateToken, async (req,
         if (typeof attachments === 'string') {
           attachments = JSON.parse(attachments);
         }
-        
+
         if (Array.isArray(attachments)) {
           const attachment = attachments.find(att => att.filename === filename);
           if (attachment) {
@@ -649,7 +649,7 @@ router.get("/:id/attachments/:filename/download", authenticateToken, async (req,
     // Download file from SFTP
     console.log('Downloading file from SFTP:', attachmentData.sftpPath);
     const fileBuffer = await sftpManager.downloadFile(attachmentData.sftpPath);
-    
+
     // Set proper headers and send file
     res.setHeader('Content-Disposition', `attachment; filename="${attachmentData.originalName}"`);
     res.setHeader('Content-Type', attachmentData.mimetype || 'application/octet-stream');
