@@ -80,7 +80,7 @@ export async function showBrowserNotification(
             tag: options.tag,
             data: options.data,
             badge: options.icon || '/favicon.ico',
-            requireInteraction: false,
+            requireInteraction: true, // Keep notification in Windows notification center
         });
 
         console.log('✅ Browser notification displayed:', options.title);
