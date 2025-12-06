@@ -36,9 +36,15 @@ export function NotificationBell() {
         <Popover open={open} onOpenChange={setOpen}>
             <PopoverTrigger asChild>
                 <Button variant="ghost" size="icon" className="relative">
-                    <Bell className="h-5 w-5 text-slate-600" />
+                    <Bell className={`h-5 w-5 text-slate-600 transition-all ${unreadCount > 0 ? 'animate-wiggle' : ''
+                        }`} />
                     {unreadCount > 0 && (
-                        <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-600 border-2 border-white" />
+                        <>
+                            <span className="absolute top-1 right-1 h-2.5 w-2.5 rounded-full bg-red-600 border-2 border-white animate-pulse" />
+                            <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold text-white bg-red-600 rounded-full px-1">
+                                {unreadCount > 9 ? '9+' : unreadCount}
+                            </span>
+                        </>
                     )}
                 </Button>
             </PopoverTrigger>

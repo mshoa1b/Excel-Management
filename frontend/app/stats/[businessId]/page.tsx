@@ -5,6 +5,16 @@ import { useParams } from 'next/navigation';
 import ProtectedRoute from '@/components/auth/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import StatsCard from '@/components/dashboard/StatsCard';
+import TrendChart from '@/components/dashboard/TrendChart';
+import IssueBarChart from '@/components/dashboard/IssueBarChart';
+import StatusPieChart from '@/components/dashboard/StatusPieChart';
+import PlatformComparison from '@/components/dashboard/PlatformComparison';
+import DataTable from '@/components/dashboard/DataTable';
+import DonutChart from '@/components/dashboard/DonutChart';
+import GroupedBarChart from '@/components/dashboard/GroupedBarChart';
+import StackedBarChart from '@/components/dashboard/StackedBarChart';
+import AdvancedDataTable from '@/components/dashboard/AdvancedDataTable';
+import HeatmapChart from '@/components/dashboard/HeatmapChart';
 import { useAuth } from '@/hooks/useAuth';
 import { useCurrency } from '@/hooks/useCurrency';
 import { useBusiness } from '@/contexts/BusinessContext';
@@ -27,7 +37,11 @@ import {
   AlertTriangle,
   FileText,
   Download,
-  Box
+  Box,
+  Users,
+  Package,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 export default function StatsPage() {
@@ -39,6 +53,15 @@ export default function StatsPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedRange, setSelectedRange] = useState('1m');
+
+  // New analytics state
+  const [platformStats, setPlatformStats] = useState<any>(null);
+  const [issueStats, setIssueStats] = useState<any>(null);
+  const [productStats, setProductStats] = useState<any>(null);
+  const [agentStats, setAgentStats] = useState<any>(null);
+  const [trendStats, setTrendStats] = useState<any>(null);
+  const [advancedStats, setAdvancedStats] = useState<any>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   // Refunds Statement state
   const [dateFrom, setDateFrom] = useState<Date>(new Date());
@@ -55,8 +78,25 @@ export default function StatsPage() {
   const loadStats = async () => {
     try {
       setLoading(true);
-      const data = await apiClient.getStats(businessId, selectedRange);
-      setStats(data);
+
+      // Load all analytics in parallel
+      const [statsData, platformData, issueData, productData, agentData, trendData, advancedData] = await Promise.all([
+        apiClient.getStats(businessId, selectedRange),
+        apiClient.getPlatformStats(businessId, selectedRange),
+        apiClient.getIssueStats(businessId, selectedRange),
+        apiClient.getProductStats(businessId, selectedRange),
+        apiClient.getAgentStats(businessId, selectedRange),
+        apiClient.getTrendStats(businessId, selectedRange),
+        apiClient.getAdvancedStats(businessId, selectedRange)
+      ]);
+
+      setStats(statsData);
+      setPlatformStats(platformData);
+      setIssueStats(issueData);
+      setProductStats(productData);
+      setAgentStats(agentData);
+      setTrendStats(trendData);
+      setAdvancedStats(advancedData);
     } catch (error) {
       console.error('Failed to load stats:', error);
     } finally {
@@ -374,6 +414,116 @@ export default function StatsPage() {
                 </Card>
               </div>
 
+              {/* NEW ANALYTICS SECTIONS */}
+
+              {/* Trends Over Time */}
+              {trendStats?.daily && trendStats.daily.length > 0 && (
+                <div className="mt-6">
+                  <TrendChart
+                    title="Returns Trend Over Time"
+                    data={trendStats.daily}
+                    height={350}
+                  />
+                </div>
+              )}
+
+              {/* Platform Comparison & Issue Analytics */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                {platformStats?.platforms && Object.keys(platformStats.platforms).length > 0 && (
+                  <PlatformComparison
+                    title="Platform Comparison"
+                    platforms={platformStats.platforms}
+                    height={300}
+                  />
+                )}
+
+                {issueStats?.statusDistribution && issueStats.statusDistribution.length > 0 && (
+                  <StatusPieChart
+                    title="Status Distribution"
+                    data={issueStats.statusDistribution}
+                    height={300}
+                  />
+                )}
+              </div>
+
+              {/* Top Issues */}
+              {issueStats?.topIssues && issueStats.topIssues.length > 0 && (
+                <div className="mt-6">
+                  <IssueBarChart
+                    title="Top 10 Most Common Issues"
+                    data={issueStats.topIssues}
+                    height={400}
+                  />
+                </div>
+              )}
+
+              {/* Lock Issues Summary */}
+              {issueStats?.lockIssues && (
+                <div className="mt-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center space-x-2">
+                        <AlertTriangle className="h-5 w-5 text-amber-600" />
+                        <span>Lock & Security Issues</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-slate-50 rounded-lg p-4">
+                          <p className="text-sm text-slate-600 mb-1">Passcode Locks</p>
+                          <p className="text-2xl font-bold text-slate-800">
+                            {issueStats.lockIssues.passcode_count || 0}
+                          </p>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-4">
+                          <p className="text-sm text-slate-600 mb-1">Apple ID Locks</p>
+                          <p className="text-2xl font-bold text-slate-800">
+                            {issueStats.lockIssues.apple_id_count || 0}
+                          </p>
+                        </div>
+                        <div className="bg-slate-50 rounded-lg p-4">
+                          <p className="text-sm text-slate-600 mb-1">Google Locks</p>
+                          <p className="text-2xl font-bold text-slate-800">
+                            {issueStats.lockIssues.google_id_count || 0}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Product Analytics */}
+              {productStats?.topReturnedSKUs && productStats.topReturnedSKUs.length > 0 && (
+                <div className="mt-6">
+                  <DataTable
+                    title="Top Returned Products"
+                    columns={['SKU', 'Return Count', 'Total Refund']}
+                    data={productStats.topReturnedSKUs.map((item: any) => ({
+                      sku: item.sku,
+                      return_count: item.return_count,
+                      total_refund: formatCurrency(item.total_refund)
+                    }))}
+                  />
+                </div>
+              )}
+
+              {/* Agent Performance */}
+              {agentStats?.agentPerformance && agentStats.agentPerformance.length > 0 && (
+                <div className="mt-6">
+                  <DataTable
+                    title="Team Performance"
+                    columns={['Agent', 'Cases Handled', 'Avg Resolution (Days)', 'Resolution Rate (%)']}
+                    data={agentStats.agentPerformance.map((item: any) => ({
+                      agent: item.agent,
+                      cases_handled: item.cases_handled,
+                      'avg_resolution_(days)': item.avg_resolution_days?.toFixed(1) || '0.0',
+                      'resolution_rate_(%)': item.resolution_rate?.toFixed(1) || '0.0'
+                    }))}
+                  />
+                </div>
+              )}
+
               {/* Refunds Statement Card */}
               <div className="mt-6">
                 <Card>
@@ -472,6 +622,306 @@ export default function StatsPage() {
                   </CardContent>
                 </Card>
               </div>
+
+              {/* Advanced Analytics Section */}
+              {advancedStats && (
+                <div className="mt-8">
+                  <Card>
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-2xl">Advanced Cross-Dimensional Analytics</CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowAdvanced(!showAdvanced)}
+                        >
+                          {showAdvanced ? (
+                            <>
+                              <ChevronUp className="h-4 w-4 mr-2" />
+                              Hide Advanced Analytics
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="h-4 w-4 mr-2" />
+                              Show Advanced Analytics
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Deep insights through 15 cross-dimensional analyses of your return data
+                      </p>
+                    </CardHeader>
+                    {showAdvanced && (
+                      <CardContent className="space-y-6">
+                        {/* Section 1: Basic Breakdowns */}
+                        <div>
+                          <h3 className="text-lg font-semibold mb-4">Core Metrics</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* 1. Resolution Breakdown */}
+                            <IssueBarChart
+                              title="Resolution Breakdown"
+                              data={advancedStats.resolutionBreakdown?.map((item: any) => ({
+                                name: item.resolution,
+                                count: item.count,
+                                percentage: item.percentage
+                              })) || []}
+                            />
+
+                            {/* 2. Return within 30 Days */}
+                            <DonutChart
+                              title="Returns Within 30 Days"
+                              data={advancedStats.return30DaysAnalysis?.map((item: any) => ({
+                                name: item.return_within_30_days === 'Yes' ? 'Within 30 Days' : 'After 30 Days',
+                                value: item.count,
+                                percentage: item.percentage
+                              })) || []}
+                              colors={['#10b981', '#f59e0b']}
+                            />
+
+                            {/* 4. Return Type Breakdown */}
+                            <DonutChart
+                              title="Return Type Distribution"
+                              data={advancedStats.returnTypeBreakdown?.map((item: any) => ({
+                                name: item.return_type,
+                                value: item.count,
+                                percentage: item.percentage
+                              })) || []}
+                            />
+
+                            {/* 5. Replacement Analysis */}
+                            {advancedStats.replacementAnalysis && advancedStats.replacementAnalysis.length > 0 && (
+                              <DonutChart
+                                title="Replacement Availability"
+                                data={advancedStats.replacementAnalysis.map((item: any) => ({
+                                  name: item.replacement_available === 'Yes' ? 'Available' : 'Not Available',
+                                  value: item.count,
+                                  percentage: item.percentage
+                                }))}
+                                colors={['#10b981', '#ef4444']}
+                              />
+                            )}
+                          </div>
+                        </div>
+
+                        {/* 3. Blocked By Analysis */}
+                        <AdvancedDataTable
+                          title="Blocked Cases Analysis"
+                          data={advancedStats.blockedByAnalysis || []}
+                          columns={[
+                            { key: 'blocked_by', label: 'Blocked By' },
+                            { key: 'count', label: 'Cases', formatter: (v) => v.toLocaleString() },
+                            { key: 'avg_blocked_days', label: 'Avg Days Blocked', formatter: (v) => v.toFixed(1) }
+                          ]}
+                          defaultSortKey="count"
+                          maxHeight="300px"
+                        />
+
+                        {/* Section 2: Cross-Dimensional Analysis */}
+                        <div>
+                          <h3 className="text-lg font-semibold mb-4">Cross-Dimensional Insights</h3>
+
+                          {/* 6. Return Type + Resolution Heatmap */}
+                          <div className="mb-6">
+                            <HeatmapChart
+                              title="Return Type vs Resolution Correlation"
+                              data={advancedStats.returnTypeResolution?.map((item: any) => ({
+                                row: item.return_type,
+                                col: item.resolution,
+                                value: item.count
+                              })) || []}
+                              valueLabel="Cases"
+                            />
+                          </div>
+
+                          {/* 7. Return Type + 30 Days */}
+                          <div className="mb-6">
+                            <GroupedBarChart
+                              title="Return Type by Warranty Period"
+                              data={(() => {
+                                const grouped: any = {};
+                                advancedStats.returnType30Days?.forEach((item: any) => {
+                                  if (!grouped[item.return_type]) {
+                                    grouped[item.return_type] = { name: item.return_type };
+                                  }
+                                  const key = item.return_within_30_days === 'Yes' ? 'within30' : 'after30';
+                                  grouped[item.return_type][key] = item.count;
+                                });
+                                return Object.values(grouped);
+                              })()}
+                              xKey="name"
+                              bars={[
+                                { key: 'within30', name: 'Within 30 Days', color: '#10b981' },
+                                { key: 'after30', name: 'After 30 Days', color: '#f59e0b' }
+                              ]}
+                            />
+                          </div>
+
+                          {/* 8. 30 Days + Resolution */}
+                          <div className="mb-6">
+                            <StackedBarChart
+                              title="Resolution by Warranty Period"
+                              data={(() => {
+                                const grouped: any = {};
+                                advancedStats.return30DaysResolution?.forEach((item: any) => {
+                                  const period = item.return_within_30_days === 'Yes' ? 'Within 30 Days' : 'After 30 Days';
+                                  if (!grouped[period]) {
+                                    grouped[period] = { name: period };
+                                  }
+                                  grouped[period][item.resolution] = item.count;
+                                });
+                                return Object.values(grouped);
+                              })()}
+                              xKey="name"
+                              bars={(() => {
+                                const resolutions = new Set<string>();
+                                advancedStats.return30DaysResolution?.forEach((item: any) => {
+                                  resolutions.add(item.resolution);
+                                });
+                                const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
+                                return Array.from(resolutions).map((res, idx) => ({
+                                  key: res,
+                                  name: res,
+                                  color: colors[idx % colors.length]
+                                }));
+                              })()}
+                              showPercentage={true}
+                            />
+                          </div>
+
+                          {/* 11. Issue + Resolution Correlation */}
+                          <div className="mb-6">
+                            <HeatmapChart
+                              title="Issue vs Resolution Correlation (Top 20)"
+                              data={advancedStats.issueResolution?.slice(0, 20).map((item: any) => ({
+                                row: item.issue,
+                                col: item.resolution,
+                                value: item.count
+                              })) || []}
+                              valueLabel="Cases"
+                            />
+                          </div>
+
+                          {/* 12. Status + Return Type */}
+                          <div className="mb-6">
+                            <StackedBarChart
+                              title="Status Distribution by Return Type"
+                              data={(() => {
+                                const grouped: any = {};
+                                advancedStats.statusReturnType?.forEach((item: any) => {
+                                  if (!grouped[item.return_type]) {
+                                    grouped[item.return_type] = { name: item.return_type };
+                                  }
+                                  grouped[item.return_type][item.status] = item.count;
+                                });
+                                return Object.values(grouped);
+                              })()}
+                              xKey="name"
+                              bars={(() => {
+                                const statuses = new Set<string>();
+                                advancedStats.statusReturnType?.forEach((item: any) => {
+                                  statuses.add(item.status);
+                                });
+                                return Array.from(statuses).map((status, idx) => ({
+                                  key: status,
+                                  name: status,
+                                  color: ['#3b82f6', '#f59e0b', '#10b981'][idx % 3]
+                                }));
+                              })()}
+                            />
+                          </div>
+
+                          {/* 13. Out of Warranty + Resolution */}
+                          <div className="mb-6">
+                            <GroupedBarChart
+                              title="Out of Warranty Impact on Resolution"
+                              data={(() => {
+                                const grouped: any = {};
+                                advancedStats.oowResolution?.forEach((item: any) => {
+                                  if (!grouped[item.resolution]) {
+                                    grouped[item.resolution] = { name: item.resolution };
+                                  }
+                                  const key = item.out_of_warranty === 'Yes' ? 'oow' : 'inWarranty';
+                                  grouped[item.resolution][key] = item.count;
+                                });
+                                return Object.values(grouped);
+                              })()}
+                              xKey="name"
+                              bars={[
+                                { key: 'inWarranty', name: 'In Warranty', color: '#10b981' },
+                                { key: 'oow', name: 'Out of Warranty', color: '#ef4444' }
+                              ]}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Section 3: Detailed Tables */}
+                        <div>
+                          <h3 className="text-lg font-semibold mb-4">Detailed Analysis Tables</h3>
+
+                          {/* 9. Multiple Return + Resolution */}
+                          <div className="mb-6">
+                            <AdvancedDataTable
+                              title="Multiple Returns by Resolution"
+                              data={advancedStats.multipleReturnResolution || []}
+                              columns={[
+                                { key: 'multiple_return', label: 'Return Frequency' },
+                                { key: 'resolution', label: 'Resolution' },
+                                { key: 'count', label: 'Cases', formatter: (v) => v.toLocaleString() }
+                              ]}
+                              defaultSortKey="count"
+                            />
+                          </div>
+
+                          {/* 10. Platform + Return Type + Resolution (3-way) */}
+                          <div className="mb-6">
+                            <AdvancedDataTable
+                              title="Platform × Return Type × Resolution (Top 20)"
+                              data={advancedStats.platformReturnResolution?.slice(0, 20) || []}
+                              columns={[
+                                { key: 'platform', label: 'Platform' },
+                                { key: 'return_type', label: 'Return Type' },
+                                { key: 'resolution', label: 'Resolution' },
+                                { key: 'count', label: 'Cases', formatter: (v) => v.toLocaleString() }
+                              ]}
+                              defaultSortKey="count"
+                            />
+                          </div>
+
+                          {/* 14. Done By + Return Type Performance */}
+                          <div className="mb-6">
+                            <AdvancedDataTable
+                              title="Agent Performance by Return Type (Top 20)"
+                              data={advancedStats.doneByReturnType?.slice(0, 20) || []}
+                              columns={[
+                                { key: 'done_by', label: 'Agent' },
+                                { key: 'return_type', label: 'Return Type' },
+                                { key: 'count', label: 'Cases', formatter: (v) => v.toLocaleString() },
+                                { key: 'avg_days', label: 'Avg Days', formatter: (v) => v?.toFixed(1) || '-' }
+                              ]}
+                              defaultSortKey="count"
+                            />
+                          </div>
+
+                          {/* 15. Apple/Google ID + Resolution */}
+                          <div className="mb-6">
+                            <AdvancedDataTable
+                              title="Lock Issues Resolution Patterns"
+                              data={advancedStats.appleGoogleResolution || []}
+                              columns={[
+                                { key: 'apple_google_id', label: 'Lock Type' },
+                                { key: 'resolution', label: 'Resolution' },
+                                { key: 'count', label: 'Cases', formatter: (v) => v.toLocaleString() }
+                              ]}
+                              defaultSortKey="count"
+                            />
+                          </div>
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                </div>
+              )}
             </>
           )}
         </div>

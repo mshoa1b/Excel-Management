@@ -181,8 +181,36 @@ class ApiClient {
   }
 
   // -------- Stats --------
-  getStats(businessId: number | string, range: "1d" | "1w" | "1m" | "3m" | "1y" | string = "1m") {
+  getStats(businessId: number | string, range: "1d" | "1w" | "1m" | "3m" | "6m" | "1y" | string = "1m") {
     return this.request(`/stats/${businessId}`, { method: "POST", body: JSON.stringify({ range }) });
+  }
+
+  getPlatformStats(businessId: number | string, range: "1d" | "1w" | "1m" | "3m" | "6m" | "1y" | string = "1m") {
+    return this.request(`/stats/${businessId}/platforms`, { method: "POST", body: JSON.stringify({ range }) });
+  }
+
+  getIssueStats(businessId: number | string, range: "1d" | "1w" | "1m" | "3m" | "6m" | "1y" | string = "1m") {
+    return this.request(`/stats/${businessId}/issues`, { method: "POST", body: JSON.stringify({ range }) });
+  }
+
+  getProductStats(businessId: number | string, range: "1d" | "1w" | "1m" | "3m" | "6m" | "1y" | string = "1m") {
+    return this.request(`/stats/${businessId}/products`, { method: "POST", body: JSON.stringify({ range }) });
+  }
+
+  getAgentStats(businessId: number | string, range: "1d" | "1w" | "1m" | "3m" | "6m" | "1y" | string = "1m") {
+    return this.request(`/stats/${businessId}/agents`, { method: "POST", body: JSON.stringify({ range }) });
+  }
+
+  getTrendStats(businessId: number | string, range: "1d" | "1w" | "1m" | "3m" | "6m" | "1y" | string = "1m") {
+    return this.request(`/stats/${businessId}/trends`, { method: "POST", body: JSON.stringify({ range }) });
+  }
+
+  getRealtimeStats(businessId: number | string) {
+    return this.request(`/stats/${businessId}/realtime`);
+  }
+
+  getAdvancedStats(businessId: number | string, range: "1d" | "1w" | "1m" | "3m" | "6m" | "1y" | string = "1m") {
+    return this.request(`/stats/${businessId}/advanced`, { method: "POST", body: JSON.stringify({ range }) });
   }
 
   // -------- Back Market Credentials --------

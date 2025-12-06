@@ -51,10 +51,18 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         requestNotificationPermission();
     }, []);
 
-    // Save to local storage whenever notifications change
+    // Save to local storage and update tab title whenever notifications change
     useEffect(() => {
         localStorage.setItem('enquiry_notifications', JSON.stringify(notifications));
-        setUnreadCount(notifications.filter(n => !n.read).length);
+        const unread = notifications.filter(n => !n.read).length;
+        setUnreadCount(unread);
+
+        // Update browser tab title with notification count
+        if (unread > 0) {
+            document.title = `(${unread}) Excel Management`;
+        } else {
+            document.title = 'Excel Management';
+        }
     }, [notifications]);
 
     // Load from API on mount and poll every minute
@@ -107,7 +115,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         };
 
         fetchNotifications();
-        const intervalId = setInterval(fetchNotifications, 60000); // 60 seconds
+        const intervalId = setInterval(fetchNotifications, 30000); // 30 seconds
 
         return () => clearInterval(intervalId);
     }, [user, router]);
