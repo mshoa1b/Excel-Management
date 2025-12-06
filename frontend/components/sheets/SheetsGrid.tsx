@@ -440,7 +440,10 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       .map(c => c.getColId())
       .filter((id): id is string => Boolean(id) && !MULTILINE_COLS.includes(String(id)));
 
-    if (ids.length) (api as any).autoSizeColumns?.(ids, false);
+    if (ids.length) {
+      // Autosize columns but skip header to fit content tightly
+      (api as any).autoSizeColumns?.(ids, false);
+    }
   }, []);
 
   const reflowAutoHeight = useCallback(() => {
@@ -745,69 +748,80 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     () => [
 
       {
+        colId: 'rowNum',
         headerName: '#',
         valueGetter: (params: any) => (params.node?.rowIndex ?? 0) + 1,
         checkboxSelection: true,
         headerCheckboxSelection: true,
         pinned: 'left',
-        width: 70,
-        suppressMenu: true
+        width: 72,
+        minWidth: 48,
+        maxWidth: 85,
+        suppressMenu: true,
+        filter: false,
+        resizable: true,
+        suppressSizeToFit: true
       },
-      { headerName: 'Order Number', field: 'order_no', editable: false, minWidth: 130, pinned: 'left' },
-      { headerName: 'Blocked By', field: 'blocked_by', editable: false, minWidth: 120, pinned: 'left' },
-      { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, minWidth: 120, hide: true },
+      { headerName: 'Order Number', field: 'order_no', editable: false, pinned: 'left' },
+      { headerName: 'Blocked By', field: 'blocked_by', editable: false, pinned: 'left' },
+      { headerName: 'Customer Name', field: 'customer_name', editable: false },
+      { headerName: 'IMEI', field: 'imei', editable: false },
+      { headerName: 'SKU', field: 'sku', editable: false },
+      { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, hide: true },
 
       {
         headerName: 'Date Received', field: 'date_received', editable: false,
         valueFormatter: dateFormatter,
-        minWidth: 130
       },
       {
         headerName: 'Order Date', field: 'order_date', editable: false,
         valueFormatter: dateFormatter,
-        minWidth: 120
       },
 
-      { headerName: 'Locked', field: 'locked', editable: false, minWidth: 120 },
-      { headerName: 'OOW Case', field: 'oow_case', editable: false, minWidth: 120 },
+      { headerName: 'Locked', field: 'locked', editable: false },
+      { headerName: 'OOW Case', field: 'oow_case', editable: false },
 
-      { headerName: 'Replacement Available', field: 'replacement_available', editable: false, minWidth: 170 },
-      { headerName: 'Done By', field: 'done_by', editable: false, minWidth: 110 },
+      { headerName: 'Replacement Available', field: 'replacement_available', editable: false },
+      { headerName: 'Done By', field: 'done_by', editable: false },
 
-      { headerName: 'Resolution', field: 'resolution', editable: false, minWidth: 160 },
+      { headerName: 'Resolution', field: 'resolution', editable: false },
 
-      { headerName: 'Refund Amount', field: 'refund_amount', editable: false, valueFormatter: (p) => typeof p.value === 'number' ? formatCurrency(p.value) : formatCurrency(0), minWidth: 130 },
+      { headerName: 'Refund Amount', field: 'refund_amount', editable: false, valueFormatter: (p) => typeof p.value === 'number' ? formatCurrency(p.value) : formatCurrency(0) },
 
       {
         headerName: 'Refund Date', field: 'refund_date', editable: false,
         valueFormatter: dateFormatter,
-        minWidth: 120
       },
 
-      { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: false, minWidth: 160 },
-      { headerName: 'Platform', field: 'platform', editable: false, valueGetter: p => computePlatform(p.data?.order_no ?? ''), minWidth: 110 },
-      { headerName: 'Return within 30 days', field: 'return_within_30_days', editable: false, valueGetter: p => computeWithin30(p.data?.date_received ?? '', p.data?.order_date ?? ''), minWidth: 180 },
+      { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: false },
+      { headerName: 'Platform', field: 'platform', editable: false, valueGetter: p => computePlatform(p.data?.order_no ?? '') },
+      { headerName: 'Return within 30 days', field: 'return_within_30_days', editable: false, valueGetter: p => computeWithin30(p.data?.date_received ?? '', p.data?.order_date ?? '') },
 
       {
         headerName: 'Issue', field: 'issue', editable: false,
-        minWidth: 160
       },
 
-      { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: false, minWidth: 140 },
+      { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: false },
 
       // Multiline, fixed width
       { headerName: 'Additional Notes', field: 'additional_notes', editable: false, wrapText: true, autoHeight: true, width: 260 },
 
-      { headerName: 'Status', field: 'status', editable: false, minWidth: 120 },
+      { headerName: 'Status', field: 'status', editable: false },
+      { headerName: 'Customer Comment', field: 'customer_comment', editable: false, wrapText: true, autoHeight: true, width: 260 },
+      { headerName: 'Multiple Return', field: 'multiple_return', editable: false },
       { headerName: 'Manager Notes', field: 'manager_notes', editable: false, wrapText: true, autoHeight: true, width: 260 },
 
-      { headerName: 'Last Updated', field: 'updated_at', editable: false, minWidth: 150, valueFormatter: (p) => p.value ? format(new Date(p.value), 'dd-MM-yyyy HH:mm') : '' },
+      { headerName: 'Last Updated', field: 'updated_at', editable: false, valueFormatter: (p) => p.value ? format(new Date(p.value), 'dd-MM-yyyy HH:mm') : '' },
 
       {
         headerName: 'Actions',
         pinned: 'right',
-        width: 220,
-        minWidth: 220,
+        width: 158,
+        minWidth: 140,
+        maxWidth: 180,
+        filter: false,
+        resizable: true,
+        suppressSizeToFit: true,
         cellRenderer: (p: any) => {
           const orderNumber = p.data?.order_no;
           const platform = computePlatform(p.data);
@@ -1115,6 +1129,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           rowData={filteredData}
           columnDefs={colDefs}
           rowSelection="multiple"
+          rowClass="group"
           rowHeight={35}
           animateRows
           enableCellTextSelection
@@ -1128,7 +1143,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             sortable: true,
             resizable: true,
             filter: true,
-            minWidth: 100,
+            minWidth: 40,
             cellClass: 'px-2 py-1 border border-gray-200',
           }}
           getRowId={p => String(p.data?.id ?? Math.random())}
