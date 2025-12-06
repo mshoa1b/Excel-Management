@@ -22,10 +22,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History, Pencil } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AttachmentManager } from './AttachmentManager';
 import { SheetHistoryModal } from './SheetHistoryModal';
+import { SheetFormModal } from './SheetFormModal';
+import { blockedByOptions, MULTILINE_COLS } from './constants';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -64,16 +66,6 @@ export interface SheetRecord {
   manager_notes: string;
   updated_at?: string;
 }
-
-const blockedByOptions = [
-  'Choose', '', 'PIN Required', 'Code Required', 'Apple ID Required', 'Google ID Required',
-  'Awaiting Part', 'Awaiting Replacement', 'Awaiting Customer', 'Awaiting BM', 'Awaiting G&I', 'Awaiting Techezm'
-];
-const lockedOptions = ['Choose', 'No', 'Google ID', 'Apple ID', 'PIN'];
-const oowOptions = ['Choose', 'No', 'Damaged', 'Wrong Device'];
-
-// Columns that should be multiline, fixed width
-const MULTILINE_COLS = ['customer_comment', 'additional_notes', 'cs_comment', 'manager_notes'];
 
 // Helpers
 const toYMD = (v: any): string => {
@@ -233,6 +225,12 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   const [historyRow, setHistoryRow] = useState<SheetRecord | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false);
   const [historySheetId, setHistorySheetId] = useState<number | null>(null);
+
+
+  // Modal Edit State
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingRow, setEditingRow] = useState<Partial<SheetRecord> | null>(null);
+
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
   const [enquiryCounts, setEnquiryCounts] = useState<{ [orderNumber: string]: number }>({});
   const [attachmentCounts, setAttachmentCounts] = useState<{ [sheetId: number]: number }>({});
@@ -586,50 +584,48 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   }, [dateFrom, dateTo, handleDateRangeFilter]);
 
   // Add/Delete
-  const addRow = async () => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    const base: Partial<SheetRecord> = {
-      blocked_by: '',
-      date_received: today,
-      order_date: today,
-      order_no: '',
-      customer_name: '',
-      imei: '',
-      sku: '',
-      customer_comment: '',
-      multiple_return: 'Choose',
-      apple_google_id: 'Choose',
-      return_type: 'Choose',
-      locked: 'Choose',
-      oow_case: 'Choose',
-      replacement_available: 'Choose',
-      done_by: 'Choose',
-      cs_comment: '',
-      resolution: 'Choose',
-      refund_amount: 0,
-      refund_date: undefined,
-      return_tracking_no: '',
-      platform: '',
-      return_within_30_days: false,
-      issue: 'Choose',
-      out_of_warranty: 'Choose',
-      additional_notes: '',
-      status: 'Pending',
-      manager_notes: '',
-    };
+  const addRow = () => {
+    setEditingRow(null);
+    setFormOpen(true);
+  };
 
-    const newSheet = await createSheet(businessId, base);
-    setRowData(prev => {
-      const newRow = normalizeForSave({ ...base, ...newSheet } as SheetRecord);
-      const newRows = [newRow, ...prev];
-      setTimeout(() => {
-        apiRef.current?.ensureIndexVisible(0, 'middle');
-        autoSizeNonMultiline();
-        reflowAutoHeight();
-      }, 50);
-      recomputeTodayTotals(newRows);
-      return newRows;
-    });
+  const handleSaveSheet = async (data: Partial<SheetRecord>) => {
+    try {
+      if (data.id) {
+        // Update existing
+        const payload = normalizeForSave({ ...data } as SheetRecord);
+        await updateSheet(String(businessId), payload);
+
+        setRowData(prev => {
+          const next = prev.map(r => r.id === payload.id ? payload : r);
+          recomputeTodayTotals(next);
+          return next;
+        });
+      } else {
+        // Create new
+        const newSheet = await createSheet(businessId, data);
+        const normalized = normalizeForSave({ ...data, ...newSheet } as SheetRecord);
+
+        setRowData(prev => {
+          const next = [normalized, ...prev];
+          recomputeTodayTotals(next);
+          return next;
+        });
+
+        setTimeout(() => {
+          apiRef.current?.ensureIndexVisible(0, 'middle');
+          autoSizeNonMultiline();
+          reflowAutoHeight();
+        }, 50);
+      }
+
+      // Refresh attachment counts if needed, though form doesn't edit attachments yet
+
+    } catch (error) {
+      console.error("Failed to save sheet", error);
+      alert("Failed to save sheet");
+      throw error; // Propagate to modal to keep it open or show error
+    }
   };
 
   const removeSelected = () => {
@@ -724,41 +720,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   };
 
   // Save edits
-  const onCellValueChanged = async (event: CellValueChangedEvent<SheetRecord>) => {
-    const r = event.data;
-    if (!r?.id) return;
 
-    const payload = normalizeForSave(r);
-
-    // Trigger BM fetch when order_no becomes 8 chars
-    if (event.colDef.field === 'order_no' && payload.order_no?.length === 8) {
-      await handleBMOrderFetch(payload);
-      apiRef.current?.redrawRows?.({ rowNodes: [event.node] });
-      return;
-    }
-
-    await updateSheet(String(payload.business_id), payload).catch(() => {
-      // Silently handle save errors
-    });
-
-    // Autosize changed column if not multiline
-    const field = event.colDef.field as string | undefined;
-    const api = apiRef.current;
-    if (field && api && !MULTILINE_COLS.includes(field)) {
-      (api as any).autoSizeColumns?.([field], false);
-    }
-
-    // Recompute when refund_date, refund_amount, platform, or order_no changes
-    if (field === 'refund_amount' || field === 'refund_date' || field === 'platform' || field === 'order_no') {
-      const next = rowData.map(x => (x.id === payload.id ? payload : x));
-      recomputeTodayTotals(next);
-      setRowData(next);
-    }
-
-    // Update auto-height and row color immediately
-    reflowAutoHeight();
-    apiRef.current?.redrawRows?.({ rowNodes: [event.node] });
-  };
 
   // Remove custom DateCellEditor - using ag-Grid's built-in agDateStringCellEditor instead
 
@@ -781,123 +743,131 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   // Columns
   const colDefs: ColDef<SheetRecord>[] = useMemo(
     () => [
-      { headerName: '', checkboxSelection: true, pinned: 'left', width: 50, suppressMenu: true },
-      { headerName: 'Order Number', field: 'order_no', editable: true, minWidth: 130, pinned: 'left' },
-      { headerName: 'Blocked By', field: 'blocked_by', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: blockedByOptions }, minWidth: 120, pinned: 'left' },
+
+      {
+        headerName: '#',
+        valueGetter: (params: any) => (params.node?.rowIndex ?? 0) + 1,
+        checkboxSelection: true,
+        headerCheckboxSelection: true,
+        pinned: 'left',
+        width: 70,
+        suppressMenu: true
+      },
+      { headerName: 'Order Number', field: 'order_no', editable: false, minWidth: 130, pinned: 'left' },
+      { headerName: 'Blocked By', field: 'blocked_by', editable: false, minWidth: 120, pinned: 'left' },
       { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, minWidth: 120, hide: true },
 
       {
-        headerName: 'Date Received', field: 'date_received', editable: true,
-        cellEditor: 'agDateStringCellEditor',
+        headerName: 'Date Received', field: 'date_received', editable: false,
         valueFormatter: dateFormatter,
-        valueParser: dateParser,
         minWidth: 130
       },
       {
-        headerName: 'Order Date', field: 'order_date', editable: true,
-        cellEditor: 'agDateStringCellEditor',
+        headerName: 'Order Date', field: 'order_date', editable: false,
         valueFormatter: dateFormatter,
-        valueParser: dateParser,
         minWidth: 120
       },
 
-      { headerName: 'Customer Name', field: 'customer_name', editable: true, minWidth: 140 },
-      { headerName: 'IMEI', field: 'imei', editable: true, minWidth: 130 },
-      { headerName: 'SKU / Product', field: 'sku', editable: true, minWidth: 150 },
+      { headerName: 'Locked', field: 'locked', editable: false, minWidth: 120 },
+      { headerName: 'OOW Case', field: 'oow_case', editable: false, minWidth: 120 },
 
-      // Multiline, fixed width
-      { headerName: 'Customer Comment', field: 'customer_comment', editable: true, cellEditor: 'agLargeTextCellEditor', cellEditorParams: { maxLength: 500, rows: 4 }, wrapText: true, autoHeight: true, width: 260 },
-      { headerName: 'CS Comment', field: 'cs_comment', editable: true, wrapText: true, autoHeight: true, width: 260 },
+      { headerName: 'Replacement Available', field: 'replacement_available', editable: false, minWidth: 170 },
+      { headerName: 'Done By', field: 'done_by', editable: false, minWidth: 110 },
 
-      { headerName: 'Multiple Return', field: 'multiple_return', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'No', '2nd Time', '3rd Time'] }, minWidth: 130 },
-      { headerName: 'Apple/Google ID', field: 'apple_google_id', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'Yes', 'Yes-Issue raised', 'No'] }, minWidth: 150, hide: true },
-      { headerName: 'Return Type', field: 'return_type', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'Refund', 'URGENT REPAIR', 'Replacement', 'Repair', 'Faulty', 'Other'] }, minWidth: 130 },
+      { headerName: 'Resolution', field: 'resolution', editable: false, minWidth: 160 },
 
-      { headerName: 'Locked', field: 'locked', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: lockedOptions }, minWidth: 120 },
-      { headerName: 'OOW Case', field: 'oow_case', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: oowOptions }, minWidth: 120 },
-
-      { headerName: 'Replacement Available', field: 'replacement_available', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'Yes', 'No'] }, minWidth: 170 },
-      { headerName: 'Done By', field: 'done_by', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: staffOptions }, minWidth: 110 },
-
-      { headerName: 'Resolution', field: 'resolution', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'Back in stock', 'Sent repaired back to customer', 'Sent back to customer', 'Sent replacement', 'Sent back to supplier', 'BER'] }, minWidth: 160 },
-
-      { headerName: 'Refund Amount', field: 'refund_amount', editable: true, valueFormatter: (p) => typeof p.value === 'number' ? formatCurrency(p.value) : formatCurrency(0), valueParser: numberParser, minWidth: 130 },
+      { headerName: 'Refund Amount', field: 'refund_amount', editable: false, valueFormatter: (p) => typeof p.value === 'number' ? formatCurrency(p.value) : formatCurrency(0), minWidth: 130 },
 
       {
-        headerName: 'Refund Date', field: 'refund_date', editable: true,
-        cellEditor: 'agDateStringCellEditor',
+        headerName: 'Refund Date', field: 'refund_date', editable: false,
         valueFormatter: dateFormatter,
-        valueParser: dateParser,
         minWidth: 120
       },
 
-      { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: true, minWidth: 160 },
+      { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: false, minWidth: 160 },
       { headerName: 'Platform', field: 'platform', editable: false, valueGetter: p => computePlatform(p.data?.order_no ?? ''), minWidth: 110 },
       { headerName: 'Return within 30 days', field: 'return_within_30_days', editable: false, valueGetter: p => computeWithin30(p.data?.date_received ?? '', p.data?.order_date ?? ''), minWidth: 180 },
 
       {
-        headerName: 'Issue', field: 'issue', editable: true, cellEditor: 'agSelectCellEditor',
-        cellEditorParams: { values: ['Choose', 'Battery', 'board', 'Body issue', 'bought wrong device', 'Buttons', 'Camera', 'Change of mind', 'Charging', 'Charging Port', 'Cosmetic', 'Damage in transit', 'GPS', 'IC', 'Language', 'Lcd', 'Mic', 'Network', 'Overheating', 'OW', 'Screen', 'Software', 'Speaker', 'Wrong product', 'No issue', 'Other'] },
+        headerName: 'Issue', field: 'issue', editable: false,
         minWidth: 160
       },
 
-      { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Choose', 'Yes', 'No'] }, minWidth: 140 },
+      { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: false, minWidth: 140 },
 
       // Multiline, fixed width
-      { headerName: 'Additional Notes', field: 'additional_notes', editable: true, wrapText: true, autoHeight: true, width: 260 },
+      { headerName: 'Additional Notes', field: 'additional_notes', editable: false, wrapText: true, autoHeight: true, width: 260 },
 
-      { headerName: 'Status', field: 'status', editable: true, cellEditor: 'agSelectCellEditor', cellEditorParams: { values: ['Pending', 'In Progress', 'Resolved'] }, minWidth: 120 },
-      { headerName: 'Manager Notes', field: 'manager_notes', editable: true, wrapText: true, autoHeight: true, width: 260 },
+      { headerName: 'Status', field: 'status', editable: false, minWidth: 120 },
+      { headerName: 'Manager Notes', field: 'manager_notes', editable: false, wrapText: true, autoHeight: true, width: 260 },
 
       { headerName: 'Last Updated', field: 'updated_at', editable: false, minWidth: 150, valueFormatter: (p) => p.value ? format(new Date(p.value), 'dd-MM-yyyy HH:mm') : '' },
 
       {
         headerName: 'Actions',
         pinned: 'right',
-        width: 160,
+        width: 220,
+        minWidth: 220,
         cellRenderer: (p: any) => {
           const orderNumber = p.data?.order_no;
           const platform = computePlatform(p.data);
           const hasEnquiry = enquiryCounts[orderNumber] > 0;
 
+          const btnClass = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white group-hover:text-slate-800 hover:bg-white/20 group-hover:hover:bg-slate-200 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2";
+          const activeBtnClass = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-all";
+
           return (
-            <div className="flex justify-end gap-1 pr-1">
-              <AttachmentManager
-                sheetId={p.data?.id}
-                attachmentCount={attachmentCounts[p.data?.id] || 0}
-                returnId={buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0)}
-                onAttachmentChange={() => {
-                  // Refresh attachment count for this row
-                  if (p.data?.id) {
-                    apiClient.getAttachments(p.data.id).then(attachments => {
-                      setAttachmentCounts(prev => ({
-                        ...prev,
-                        [p.data.id]: attachments.length
-                      }));
-                    }).catch(() => {
-                      // Ignore errors for count updates
-                    });
+            <div className="flex items-center justify-end gap-1 h-full w-full pr-2">
+              <div className="flex-shrink-0">
+                <AttachmentManager
+                  sheetId={p.data?.id}
+                  attachmentCount={attachmentCounts[p.data?.id] || 0}
+                  returnId={buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0)}
+                  onAttachmentChange={() => {
+                    if (p.data?.id) {
+                      apiClient.getAttachments(p.data.id).then(attachments => {
+                        setAttachmentCounts(prev => ({
+                          ...prev,
+                          [p.data.id]: attachments.length
+                        }));
+                      }).catch(() => { });
+                    }
+                  }}
+                />
+              </div>
+
+              <button
+                className={btnClass}
+                onClick={() => {
+                  if (p.data) {
+                    setEditingRow(p.data);
+                    setFormOpen(true);
                   }
                 }}
-              />
+                title="Edit Row"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+
               <button
-                className={`rounded-md px-2 py-1 text-white group-hover:text-black hover:bg-gray-100 ${hasEnquiry ? 'bg-blue-500' : 'bg-gray-400'
-                  }`}
+                className={hasEnquiry ? activeBtnClass : btnClass}
                 onClick={() => orderNumber && handleEnquiryAction(orderNumber, platform)}
                 title={hasEnquiry ? 'View existing enquiry' : 'Create new enquiry'}
                 disabled={!orderNumber}
               >
                 <MessageSquare className="h-4 w-4" />
               </button>
+
               <button
-                className="rounded-md px-2 py-1 text-white group-hover:text-black hover:bg-gray-100"
+                className={`${btnClass} hover:text-red-600 hover:bg-red-50`}
                 onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
                 title="Delete row"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
+
               <button
-                className="rounded-md px-2 py-1 text-white bg-gray-400 group-hover:text-black hover:bg-gray-100"
+                className={btnClass}
                 onClick={() => p.data && handleViewHistory(p.data)}
                 title="View History"
               >
@@ -910,7 +880,6 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     ],
     [businessId, refresh, staffOptions, formatCurrency, attachmentCounts, enquiryCounts]
   );
-
   // Grid events
   const onGridReady = useCallback((params: GridReadyEvent<SheetRecord>) => {
     apiRef.current = params.api;
@@ -1145,11 +1114,10 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           onGridReady={onGridReady}
           rowData={filteredData}
           columnDefs={colDefs}
+          rowSelection="multiple"
+          rowHeight={35}
           animateRows
-          singleClickEdit
-          stopEditingWhenCellsLoseFocus
           enableCellTextSelection
-          onCellValueChanged={onCellValueChanged}
           onFirstDataRendered={onFirstDataRendered}
           onGridSizeChanged={onGridSizeChanged}
           onColumnResized={onColumnResized}
@@ -1208,6 +1176,16 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+
+      <SheetFormModal
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        initialData={editingRow}
+        onSave={handleSaveSheet}
+        businessId={businessId}
+        staffOptions={staffOptions}
+      />
 
       <SheetHistoryModal
         businessId={Number(businessId)}
