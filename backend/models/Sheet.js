@@ -7,7 +7,7 @@ const getSheets = async (business_id) => {
 };
 
 // ---------------- CREATE SHEET ----------------
-const createSheet = async (sheet) => {
+const createSheet = async (sheet, userId) => {
   console.log('Creating sheet with data:', JSON.stringify(sheet, null, 2));
   
   const {
@@ -70,12 +70,57 @@ const createSheet = async (sheet) => {
     queryParams
   );
 
-  console.log('Sheet created successfully:', result.rows[0]);
-  return result.rows[0];
+  const created = result.rows[0];
+  console.log('Sheet created successfully:', created);
+
+  // LOG HISTORY (CREATE)
+  try {
+    const changes = {}; 
+    // For CREATE, everything is a change. We can either log everything or just "Created".
+    // Let's log 'Created' logic or all initial values if desired. 
+    // User asked for "updated values", for Create it's all new. 
+    // We can leave 'changes' empty or populate with initial state. 
+    // Let's leave it empty for CREATE as the snapshot has everything.
+
+    const historyParams = [
+      created.id,
+      userId || null,
+      'CREATE',
+      created.date_received, created.order_no, created.order_date, created.customer_name, created.imei, created.sku,
+      created.customer_comment, created.multiple_return, created.apple_google_id, created.return_type, created.locked, created.oow_case,
+      created.replacement_available, created.done_by, created.blocked_by, created.cs_comment, created.resolution,
+      created.refund_amount, created.refund_date, created.return_tracking_no, created.platform, created.return_within_30_days,
+      created.issue, created.out_of_warranty, created.additional_notes, created.status, created.manager_notes,
+      JSON.stringify(changes)
+    ];
+
+    await pool.query(
+      `INSERT INTO sheets_history
+        (sheet_id, changed_by, change_type,
+         date_received, order_no, order_date, customer_name, imei, sku,
+         customer_comment, multiple_return, apple_google_id, return_type, locked, oow_case,
+         replacement_available, done_by, blocked_by, cs_comment, resolution,
+         refund_amount, refund_date, return_tracking_no, platform, return_within_30_days,
+         issue, out_of_warranty, additional_notes, status, manager_notes, changes)
+       VALUES
+        ($1, $2, $3,
+         $4, $5, $6, $7, $8, $9,
+         $10, $11, $12, $13, $14, $15,
+         $16, $17, $18, $19, $20,
+         $21, $22, $23, $24, $25,
+         $26, $27, $28, $29, $30, $31)`,
+      historyParams
+    );
+    console.log(`History logged for new sheet ${created.id}`);
+  } catch (histErr) {
+    console.error("Failed to log sheet history for create:", histErr);
+  }
+
+  return created;
 };
 
 // ---------------- UPDATE SHEET ----------------
-const updateSheet = async (sheet) => {
+const updateSheet = async (sheet, userId) => {
   const { id, business_id } = sheet;
 
   if (!id || !business_id) {
@@ -93,6 +138,102 @@ const updateSheet = async (sheet) => {
   }
 
   const current = currentRes.rows[0];
+
+  // 1.5. LOG HISTORY (Snapshot of BEFORE update)
+  // 1.5. LOG HISTORY (Snapshot of BEFORE update + Diffs)
+  try {
+    // Calculate changes
+    const changes = {};
+    const fieldsToCheck = [
+        'date_received', 'order_no', 'order_date', 'customer_name', 'imei', 'sku',
+        'customer_comment', 'multiple_return', 'apple_google_id', 'return_type', 'locked', 'oow_case',
+        'replacement_available', 'done_by', 'blocked_by', 'cs_comment', 'resolution',
+        'refund_amount', 'refund_date', 'return_tracking_no', 'issue', 'out_of_warranty',
+        'additional_notes', 'status', 'manager_notes'
+    ];
+
+    fieldsToCheck.forEach(key => {
+        if (sheet.hasOwnProperty(key)) {
+            let newVal = sheet[key];
+            let oldVal = current[key];
+
+            // Helper to safe format YYYY-MM-DD in LOCAL time (ignoring time component)
+            // toISOString() uses UTC which causes 1-day shift in positive timezones.
+            const toYMD = (val) => {
+               if (val === null || val === undefined || val === '') return '';
+               if (val instanceof Date) {
+                   const y = val.getFullYear();
+                   const m = String(val.getMonth() + 1).padStart(2, '0');
+                   const d = String(val.getDate()).padStart(2, '0');
+                   return `${y}-${m}-${d}`;
+               }
+               return String(val).slice(0, 10); // Handle string dates
+            };
+
+            let newValComp = newVal;
+            let oldValComp = oldVal;
+
+            if (['date_received', 'order_date', 'refund_date'].includes(key)) {
+                newValComp = toYMD(newVal);
+                oldValComp = toYMD(oldVal);
+            } else {
+                // Non-date handling
+                // Treat null/undefined/empty string as equivalent
+                if ((newVal === '' || newVal === null) && (oldVal === '' || oldVal === null)) return;
+                
+                // Handle number comparison (frontend sends number, DB might have string '50.00')
+                if (typeof newVal === 'number' && typeof oldVal === 'string') {
+                   // Ensure oldVal is actually numeric before casting
+                   if (!isNaN(oldVal)) oldValComp = Number(oldVal);
+                }
+                
+                // String normalization if needed
+                if (typeof newValComp === 'string') newValComp = newValComp.trim();
+                // oldVal via PG is usually not padded but let's be safe
+                if (typeof oldValComp === 'string') oldValComp = oldValComp.trim();
+            }
+
+            if (newValComp != oldValComp) {
+                // Save the pretty formatted simple strings for the UI
+                changes[key] = { old: oldValComp, new: newValComp };
+            }
+        }
+    });
+
+    const historyParams = [
+      current.id,
+      userId || null, // changed_by
+      'UPDATE',       // change_type
+      current.date_received, current.order_no, current.order_date, current.customer_name, current.imei, current.sku,
+      current.customer_comment, current.multiple_return, current.apple_google_id, current.return_type, current.locked, current.oow_case,
+      current.replacement_available, current.done_by, current.blocked_by, current.cs_comment, current.resolution,
+      current.refund_amount, current.refund_date, current.return_tracking_no, current.platform, current.return_within_30_days,
+      current.issue, current.out_of_warranty, current.additional_notes, current.status, current.manager_notes,
+      JSON.stringify(changes)
+    ];
+
+    await pool.query(
+      `INSERT INTO sheets_history
+        (sheet_id, changed_by, change_type,
+         date_received, order_no, order_date, customer_name, imei, sku,
+         customer_comment, multiple_return, apple_google_id, return_type, locked, oow_case,
+         replacement_available, done_by, blocked_by, cs_comment, resolution,
+         refund_amount, refund_date, return_tracking_no, platform, return_within_30_days,
+         issue, out_of_warranty, additional_notes, status, manager_notes, changes)
+       VALUES
+        ($1, $2, $3,
+         $4, $5, $6, $7, $8, $9,
+         $10, $11, $12, $13, $14, $15,
+         $16, $17, $18, $19, $20,
+         $21, $22, $23, $24, $25,
+         $26, $27, $28, $29, $30, $31)`,
+      historyParams
+    );
+    console.log(`History logged for sheet ${id}`);
+  } catch (histErr) {
+    console.error("Failed to log sheet history:", histErr);
+    // We don't block the update if logging fails, but it's good to note.
+  }
 
   // 2. Merge incoming data with current data
   // We only use fields that are present in the 'sheet' object.
@@ -154,4 +295,32 @@ const deleteSheet = async (id, business_id) => {
   await pool.query('DELETE FROM sheets WHERE id=$1 AND business_id=$2', [id, business_id]);
 };
 
-module.exports = { getSheets, createSheet, updateSheet, deleteSheet };
+// ---------------- GET HISTORY ----------------
+const getSheetHistory = async (businessId, sheetId = null) => {
+  // changed_at is TIMESTAMP without time zone (stored as UTC). 
+  // We cast it to TIMESTAMPTZ by specifying it's in UTC, so 'pg' parses it correctly as absolute time.
+  let query = `
+    SELECT h.*, 
+           (h.changed_at AT TIME ZONE 'UTC') as changed_at,
+           u.username as changed_by_name,
+           s.order_no as current_order_no, s.customer_name as current_customer_name
+    FROM sheets_history h
+    JOIN sheets s ON h.sheet_id = s.id
+    LEFT JOIN users u ON h.changed_by = u.id
+    WHERE s.business_id = $1
+  `;
+  
+  const params = [businessId];
+
+  if (sheetId) {
+    query += ` AND h.sheet_id = $2`;
+    params.push(sheetId);
+  }
+
+  query += ` ORDER BY h.changed_at DESC`;
+
+  const result = await pool.query(query, params);
+  return result.rows;
+};
+
+module.exports = { getSheets, createSheet, updateSheet, deleteSheet, getSheetHistory };

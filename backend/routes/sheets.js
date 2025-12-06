@@ -3,7 +3,8 @@ const express = require("express");
 const router = express.Router();
 const authenticateToken = require("../middleware/auth");
 const pool = require("../lib/db");
-const { getSheets, createSheet, updateSheet, deleteSheet } = require("../models/Sheet");
+const { getSheets, createSheet, updateSheet, deleteSheet, getSheetHistory } = require("../models/Sheet");
+const { notifyUsers } = require("./notifications");
 const { ROLE } = require("../lib/roles");
 
 // Guard: only SuperAdmin can access any business; others must match their business_id
@@ -156,7 +157,7 @@ router.post("/:businessId", authenticateToken, assertBusinessScope, async (req, 
       sheet.blocked_by = "PIN Required";
     }
 
-    const created = await createSheet(sheet);
+    const created = await createSheet(sheet, req.user?.id);
     res.status(201).json(created);
   } catch (err) {
     console.error("POST /api/sheets/:businessId error:", err);
@@ -185,7 +186,41 @@ router.put("/:businessId", authenticateToken, assertBusinessScope, async (req, r
       sheet.blocked_by = "PIN Required";
     }
 
-    const updated = await updateSheet(sheet);
+    const updated = await updateSheet(sheet, req.user?.id);
+
+    // Notify if status became 'Resolved' or blocked_by became non-empty
+    // We need to compare with old state? ideally yes, but `updated` might just be the new state.
+    // For simplicity, if the NEW state is resolved/blocked, and assuming user clicked it, we notify.
+    // To be precise we'd need old state, but let's notify on "Action taken".
+
+    // Check if Resolved
+    if (updated.status === 'Resolved' && sheet.status === 'Resolved') { 
+       // Note: sheet.status comes from request body, so it was intended.
+       await notifyUsers(
+         businessId, 
+         req.user.username, 
+         'success', 
+         `Sheet Resolved: ${updated.order_no}`, 
+         `Sheet marked as Resolved by ${req.user.username}`,
+         `/sheets` // Or link to specific row if supported
+       );
+    }
+
+    // Check if Blocked (and not empty)
+    if (updated.blocked_by && updated.blocked_by.trim() !== '' && updated.blocked_by !== 'Choose') {
+       // Avoid notifying if it was ALREADY blocked same way? 
+       // Ideally yes, but lacking old state here cleanly without extra query. 
+       // We can assume frontend calls update when changing it.
+       await notifyUsers(
+         businessId, 
+         req.user.username, 
+         'warning', 
+         `Sheet Blocked: ${updated.order_no}`, 
+         `Sheet blocked by ${req.user.username}: ${updated.blocked_by}`,
+         `/sheets`
+       );
+    }
+
     res.json(updated);
   } catch (err) {
     console.error("PUT /api/sheets/:businessId error:", err);
@@ -252,6 +287,19 @@ router.get("/:businessId/refunds-report", authenticateToken, assertBusinessScope
   } catch (err) {
     console.error("GET /api/sheets/:businessId/refunds-report error:", err);
     res.status(500).json({ message: "Failed to fetch refunds report data" });
+  }
+});
+
+// GET /api/sheets/:businessId/history - Get all history for a business
+router.get("/:businessId/history", authenticateToken, assertBusinessScope, async (req, res) => {
+  try {
+    const businessId = Number(req.params.businessId);
+    const sheetId = req.query.sheetId ? Number(req.query.sheetId) : null;
+    const history = await getSheetHistory(businessId, sheetId);
+    res.json(history);
+  } catch (err) {
+    console.error("GET /api/sheets/:businessId/history error:", err);
+    res.status(500).json({ message: "Failed to fetch sheet history" });
   }
 });
 

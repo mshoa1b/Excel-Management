@@ -112,6 +112,7 @@ app.use("/api/stats", statsRoutes);
 app.use("/api/bmOrders", bmOrdersRoutes);
 app.use("/api/attachments", attachmentRoutes);
 app.use("/api/enquiries", enquiriesRoutes);
+app.use("/api/notifications", require("./routes/notifications").router);
 
 app.use("/api", backmarketCredsRoutes);
 

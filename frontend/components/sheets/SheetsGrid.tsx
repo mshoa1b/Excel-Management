@@ -22,9 +22,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AttachmentManager } from './AttachmentManager';
+import { SheetHistoryModal } from './SheetHistoryModal';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -229,13 +230,13 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState<boolean>(false);
   const [selectedRowsForDeletion, setSelectedRowsForDeletion] = useState<number[]>([]);
   const [singleRowIdForDeletion, setSingleRowIdForDeletion] = useState<number | null>(null);
-  const [totals, setTotals] = useState<{ amazon: number; backmarket: number; total: number }>({
-    amazon: 0, backmarket: 0, total: 0
-  });
-  const [attachmentCounts, setAttachmentCounts] = useState<{ [sheetId: number]: number }>({});
-  const [enquiryCounts, setEnquiryCounts] = useState<{ [orderNumber: string]: number }>({});
+  const [historyRow, setHistoryRow] = useState<SheetRecord | null>(null);
+  const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false);
+  const [historySheetId, setHistorySheetId] = useState<number | null>(null);
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
-
+  const [enquiryCounts, setEnquiryCounts] = useState<{ [orderNumber: string]: number }>({});
+  const [attachmentCounts, setAttachmentCounts] = useState<{ [sheetId: number]: number }>({});
+  const [totals, setTotals] = useState<{ amazon: number; backmarket: number; total: number }>({ amazon: 0, backmarket: 0, total: 0 });
   // Enquiry handling functions
   const checkExistingEnquiry = async (orderNumber: string) => {
     try {
@@ -663,31 +664,58 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     }
   };
 
+  const handleViewHistory = (row: SheetRecord) => {
+    if (!row?.id) return;
+    setHistorySheetId(row.id);
+    setHistoryRow(row);
+    setHistoryModalOpen(true);
+  };
+
+  const handleHistoryClick = () => {
+    const selectedRows = apiRef.current?.getSelectedRows();
+    if (!selectedRows || selectedRows.length === 0) {
+      alert("Please select a row to view history.");
+      return;
+    }
+    if (selectedRows.length > 1) {
+      alert("Please select only one row to view history.");
+      return;
+    }
+    handleViewHistory(selectedRows[0]);
+  };
+
   // BM auto-fill
   const handleBMOrderFetch = async (row: SheetRecord) => {
     if (!row.order_no || row.order_no.length !== 8) return;
-    const data = await fetchBMOrder(row.order_no);
-    if (!data) return;
+    try {
+      const data = await fetchBMOrder(row.order_no);
+      if (!data) return;
 
-    const updated: Partial<SheetRecord> = {
-      customer_name: data.customer_name,
-      imei: data.imei,
-      sku: data.sku,
-      refund_amount: Number(data.refund_amount ?? 0),
-      return_tracking_no: data.return_tracking_no,
-      platform: data.platform,
-      order_date: toYMD(data.order_date ?? new Date()),
-      date_received: toYMD(data.date_received ?? new Date()),
-    };
+      const updated: Partial<SheetRecord> = {
+        customer_name: data.customer_name,
+        imei: data.imei,
+        sku: data.sku,
+        refund_amount: Number(data.refund_amount ?? 0),
+        return_tracking_no: data.return_tracking_no,
+        platform: data.platform,
+        order_date: toYMD(data.order_date ?? new Date()),
+        date_received: toYMD(data.date_received ?? new Date()),
+      };
 
-    const payload = normalizeForSave({ ...row, ...updated } as SheetRecord);
-    await updateSheet(String(row.business_id), payload);
+      const payload = normalizeForSave({ ...row, ...updated } as SheetRecord);
+      await updateSheet(String(row.business_id), payload);
 
-    setRowData(prev => {
-      const next = prev.map(r => (r.id === row.id ? { ...r, ...payload } : r));
-      recomputeTodayTotals(next);
-      return next;
-    });
+      setRowData(prev => {
+        const next = prev.map(r => (r.id === row.id ? { ...r, ...payload } : r));
+        recomputeTodayTotals(next);
+        return next;
+      });
+    } catch (error) {
+      console.warn("Back Market fetch failed (likely no creds):", error);
+      // Suppress alert to avoid disrupting user workflow, but log it.
+    }
+
+
 
     setTimeout(() => {
       autoSizeNonMultiline();
@@ -868,7 +896,14 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               >
                 <Trash2 className="h-4 w-4" />
               </button>
-            </div>
+              <button
+                className="rounded-md px-2 py-1 text-white bg-gray-400 group-hover:text-black hover:bg-gray-100"
+                onClick={() => p.data && handleViewHistory(p.data)}
+                title="View History"
+              >
+                <History className="h-4 w-4" />
+              </button>
+            </div >
           );
         },
       },
@@ -1039,6 +1074,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       <div className="flex items-center gap-2 mb-2">
         <Button className="gap-2" onClick={addRow}><Plus /> New Row</Button>
         <Button variant="outline" className="gap-2" onClick={removeSelected}><Trash2 /> Delete Selected</Button>
+        <Button variant="outline" className="gap-2" onClick={handleHistoryClick}><History /> History</Button>
         <Button variant="outline" className="gap-2" onClick={refresh}><RotateCcw /> Refresh</Button>
         <Button
           variant="outline"
@@ -1172,6 +1208,17 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <SheetHistoryModal
+        businessId={Number(businessId)}
+        sheetId={historySheetId || undefined}
+        currentRow={historyRow}
+        open={historyModalOpen}
+        onOpenChange={(val) => {
+          setHistoryModalOpen(val);
+          if (!val) setHistoryRow(null);
+        }}
+      />
     </div>
   );
 }

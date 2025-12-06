@@ -57,82 +57,48 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         setUnreadCount(notifications.filter(n => !n.read).length);
     }, [notifications]);
 
-    // Polling logic
+    // Load from API on mount and poll every minute
     useEffect(() => {
         if (!user) return;
 
-        const isTechezm = user.username?.toLowerCase().startsWith('cs');
-        const myTeamStatus = isTechezm ? 'Awaiting Techezm' : 'Awaiting Business';
-        const myTeamName = isTechezm ? 'Techezm Team' : 'Business Team';
-
-        const pollEnquiries = async () => {
+        const fetchNotifications = async () => {
             try {
-                const enquiries = await apiClient.request('/enquiries');
-
-                const now = new Date();
-                const newNotifications: NotificationItem[] = [];
-
-                enquiries.forEach((enquiry: any) => {
-                    const updatedAt = new Date(enquiry.updated_at);
-                    const createdAt = new Date(enquiry.created_at);
-
-                    // Check if enquiry was updated AFTER our last poll
-                    if (updatedAt > lastPolledAt.current) {
-                        // Check if it's waiting for MY team
-                        if (enquiry.status === myTeamStatus) {
-                            // Check for silent creation
-                            const isCreation = Math.abs(updatedAt.getTime() - createdAt.getTime()) < 2000; // 2 seconds tolerance
-                            const isSilent = enquiry.description?.startsWith('[SILENT]');
-
-                            if (isCreation && isSilent) {
-                                return; // Skip notification
-                            }
-
-                            const notification: NotificationItem = {
-                                id: `${enquiry.id}-${updatedAt.getTime()}`,
-                                title: 'Action Required',
-                                message: `Enquiry #${enquiry.order_number} is awaiting ${myTeamName}.`,
-                                timestamp: now.toISOString(),
-                                read: false,
-                                link: `/enquiries/${enquiry.id}`,
-                                type: 'warning'
-                            };
-                            newNotifications.push(notification);
-
-                            // Send browser notification
-                            if (Notification.permission === 'granted') {
-                                new Notification(notification.title, {
-                                    body: notification.message,
-                                    icon: '/favicon.ico'
-                                });
-                            }
-                        }
-                    }
-                });
-
-                if (newNotifications.length > 0) {
-                    setNotifications(prev => [...newNotifications, ...prev]);
-                }
-
-                lastPolledAt.current = now;
+                const data = await apiClient.getNotifications();
+                // Merge with local state to avoid flickering if possible, or just replace
+                // For simplicity, replacing:
+                setNotifications(data);
+                setUnreadCount(data.filter((n: NotificationItem) => !n.read).length);
             } catch (error) {
-                console.error('Polling error:', error);
+                console.error('Failed to fetch notifications:', error);
             }
         };
 
-        const intervalId = setInterval(pollEnquiries, 60000); // 60 seconds
+        fetchNotifications();
+        const intervalId = setInterval(fetchNotifications, 60000); // 60 seconds
 
         return () => clearInterval(intervalId);
     }, [user]);
 
-    const markAsRead = (id: string) => {
-        setNotifications(prev => prev.map(n =>
-            n.id === id ? { ...n, read: true } : n
-        ));
+    const markAsRead = async (id: string) => {
+        try {
+            await apiClient.markNotificationAsRead(id);
+            setNotifications(prev => prev.map(n =>
+                n.id === id ? { ...n, read: true } : n
+            ));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+        } catch (error) {
+            console.error('Failed to mark notification as read:', error);
+        }
     };
 
-    const markAllAsRead = () => {
-        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    const markAllAsRead = async () => {
+        try {
+            await apiClient.markAllNotificationsAsRead();
+            setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+            setUnreadCount(0);
+        } catch (error) {
+            console.error('Failed to mark all notifications as read:', error);
+        }
     };
 
     const clearNotifications = () => {

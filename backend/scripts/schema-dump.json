@@ -1,0 +1,480 @@
+{
+  "attachments": [
+    {
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "nextval('attachments_id_seq'::regclass)"
+    },
+    {
+      "column_name": "sheet_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "business_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "filename",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "original_name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "file_size",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "mime_type",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "sftp_path",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "uploaded_by",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "column_default": "CURRENT_TIMESTAMP"
+    }
+  ],
+  "backmarket_credentials": [
+    {
+      "column_name": "business_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "api_key_enc",
+      "data_type": "text",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "api_secret_enc",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "updated_by",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "updated_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "NO",
+      "column_default": "now()"
+    }
+  ],
+  "businesses": [
+    {
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "nextval('businesses_id_seq'::regclass)"
+    },
+    {
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "owner_id",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "currency_code",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'USD'::character varying"
+    },
+    {
+      "column_name": "currency_symbol",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'$'::character varying"
+    }
+  ],
+  "enquiries": [
+    {
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "nextval('enquiries_id_seq'::regclass)"
+    },
+    {
+      "column_name": "status",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": "'Awaiting Business'::character varying"
+    },
+    {
+      "column_name": "enquiry_date",
+      "data_type": "date",
+      "is_nullable": "NO",
+      "column_default": "CURRENT_DATE"
+    },
+    {
+      "column_name": "order_number",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "platform",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "description",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "business_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "created_by",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "column_name": "updated_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "column_default": "CURRENT_TIMESTAMP"
+    }
+  ],
+  "enquiry_messages": [
+    {
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "nextval('enquiry_messages_id_seq'::regclass)"
+    },
+    {
+      "column_name": "enquiry_id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "message",
+      "data_type": "text",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "attachments",
+      "data_type": "json",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "created_by",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "column_default": "CURRENT_TIMESTAMP"
+    }
+  ],
+  "roles": [
+    {
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "nextval('roles_id_seq'::regclass)"
+    },
+    {
+      "column_name": "name",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "permissions",
+      "data_type": "ARRAY",
+      "is_nullable": "YES",
+      "column_default": "'{}'::text[]"
+    }
+  ],
+  "sheets": [
+    {
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "nextval('sheets_id_seq'::regclass)"
+    },
+    {
+      "column_name": "business_id",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "date_received",
+      "data_type": "date",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "order_no",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "order_date",
+      "data_type": "date",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "customer_name",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "imei",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "sku",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "customer_comment",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "multiple_return",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "apple_google_id",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "return_type",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "locked",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "oow_case",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "replacement_available",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "done_by",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "blocked_by",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "cs_comment",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "resolution",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "refund_amount",
+      "data_type": "numeric",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "refund_date",
+      "data_type": "date",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "return_tracking_no",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "platform",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "return_within_30_days",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "issue",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "out_of_warranty",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Choose'::character varying"
+    },
+    {
+      "column_name": "additional_notes",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "status",
+      "data_type": "character varying",
+      "is_nullable": "YES",
+      "column_default": "'Pending'::character varying"
+    },
+    {
+      "column_name": "manager_notes",
+      "data_type": "text",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "column_name": "updated_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "column_default": "CURRENT_TIMESTAMP"
+    }
+  ],
+  "users": [
+    {
+      "column_name": "id",
+      "data_type": "integer",
+      "is_nullable": "NO",
+      "column_default": "nextval('users_id_seq'::regclass)"
+    },
+    {
+      "column_name": "username",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "password_hash",
+      "data_type": "character varying",
+      "is_nullable": "NO",
+      "column_default": null
+    },
+    {
+      "column_name": "role_id",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "business_id",
+      "data_type": "integer",
+      "is_nullable": "YES",
+      "column_default": null
+    },
+    {
+      "column_name": "created_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "column_default": "CURRENT_TIMESTAMP"
+    },
+    {
+      "column_name": "updated_at",
+      "data_type": "timestamp without time zone",
+      "is_nullable": "YES",
+      "column_default": "CURRENT_TIMESTAMP"
+    }
+  ]
+}

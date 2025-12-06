@@ -270,6 +270,28 @@ class ApiClient {
     const tokenParam = token ? `?token=${encodeURIComponent(token)}` : '';
     return `${baseUrl}/api/attachments/download/${attachmentId}${tokenParam}`;
   }
+
+  // -------- Notifications --------
+  getNotifications() {
+    return this.request("/notifications");
+  }
+
+  markNotificationAsRead(id: string) {
+    return this.request(`/notifications/${id}/read`, { method: "POST" });
+  }
+
+  markAllNotificationsAsRead() {
+    return this.request("/notifications/read-all", { method: "POST" });
+  }
+
+  // -------- Sheet History --------
+  getSheetHistory(businessId: number | string, sheetId?: number | string) {
+    let url = `/sheets/${businessId}/history`;
+    if (sheetId) {
+      url += `?sheetId=${sheetId}`;
+    }
+    return this.request(url);
+  }
 }
 
 export const apiClient = new ApiClient();

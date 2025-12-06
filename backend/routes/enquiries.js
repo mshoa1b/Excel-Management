@@ -3,6 +3,7 @@ const express = require("express");
 const router = express.Router();
 const authenticateToken = require("../middleware/auth");
 const pool = require("../lib/db");
+const { notifyUsers } = require("./notifications");
 const { ROLE } = require("../lib/roles");
 const multer = require("multer");
 const path = require("path");
@@ -274,6 +275,20 @@ router.post("/", authenticateToken, async (req, res) => {
       createdBy
     ]);
 
+
+    // Notify relevant users
+    // If SuperAdmin created it, notify Business users? Or system default?
+    // Usually Business User creates enquiry -> Notify CS
+    // If CS creates enquiry (?) -> Notify Business
+    await notifyUsers(
+      targetBusinessId, 
+      req.user.username, 
+      'info', 
+      `New Enquiry: ${order_number}`, 
+      `New enquiry created by ${req.user.username}`,
+      `/enquiries/${rows[0].id}`
+    );
+
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error("POST /api/enquiries error:", err);
@@ -297,7 +312,7 @@ router.post("/:id/messages", authenticateToken, upload.array('files', 5), async 
     }
 
     // Verify user has access to this enquiry
-    let checkQuery = "SELECT id, business_id, status FROM enquiries WHERE id = $1";
+    let checkQuery = "SELECT id, business_id, status, order_number FROM enquiries WHERE id = $1";
     let checkParams = [enquiryId];
     
     if (myRole !== ROLE.SUPER_ADMIN) {
@@ -382,6 +397,22 @@ router.post("/:id/messages", authenticateToken, upload.array('files', 5), async 
     const { rows: updatedEnquiry } = await pool.query(
       "UPDATE enquiries SET status = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING order_number, business_id",
       [newStatus, enquiryId]
+    );
+
+
+    // Notify relevant users
+    console.log('DEBUG NOTIFICATION: enquiry=', enquiry);
+    console.log('DEBUG NOTIFICATION: updatedEnquiry=', updatedEnquiry[0]);
+
+    const orderNo = updatedEnquiry[0]?.order_number || enquiry.order_number || 'Unknown Order';
+
+    await notifyUsers(
+      enquiry.business_id, 
+      req.user.username, 
+      'info', 
+      `New Reply: ${orderNo}`, 
+      `New reply from ${req.user.username}`,
+      `/enquiries/${enquiryId}`
     );
 
     res.status(201).json(messageRows[0]);
