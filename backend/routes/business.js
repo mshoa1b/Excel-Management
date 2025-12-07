@@ -50,10 +50,10 @@ router.get("/:businessId/users", authenticateToken, async (req, res) => {
     }
 
     // RBAC
-    if (req.user.role_id !== ROLE.SUPER_ADMIN && req.user.role_id !== ROLE.BUSINESS_ADMIN) {
-      return res.status(403).json({ message: "Forbidden" });
-    }
-    if (req.user.role_id === ROLE.BUSINESS_ADMIN && req.user.business_id !== businessId) {
+    const isSuperAdmin = req.user.role_id === ROLE.SUPER_ADMIN;
+    const isBusinessUser = (req.user.role_id === ROLE.BUSINESS_ADMIN || req.user.role_id === ROLE.USER) && req.user.business_id === businessId;
+
+    if (!isSuperAdmin && !isBusinessUser) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
