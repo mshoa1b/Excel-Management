@@ -762,18 +762,18 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         checkboxSelection: true,
         headerCheckboxSelection: true,
         pinned: 'left',
-        width: 72,
-        minWidth: 48,
-        maxWidth: 85,
+        width: 90,
+        minWidth: 90,
+        maxWidth: 100,
         suppressMenu: true,
         filter: false,
         resizable: true,
         suppressSizeToFit: true
       },
-      { headerName: 'Order Number', field: 'order_no', editable: false, pinned: 'left' },
+      { headerName: 'Order Number', field: 'order_no', editable: false, pinned: 'left', minWidth: 150 },
       { headerName: 'Blocked By', field: 'blocked_by', editable: false, pinned: 'left' },
       { headerName: 'Customer Name', field: 'customer_name', editable: false },
-      { headerName: 'IMEI', field: 'imei', editable: false },
+      { headerName: 'IMEI', field: 'imei', editable: false, minWidth: 150 },
       { headerName: 'SKU', field: 'sku', editable: false },
       { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, hide: true },
 
@@ -786,6 +786,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         valueFormatter: dateFormatter,
       },
 
+      { headerName: 'Return Type', field: 'return_type', editable: false },
       { headerName: 'Locked', field: 'locked', editable: false },
       { headerName: 'OOW Case', field: 'oow_case', editable: false },
 
@@ -837,7 +838,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           const hasEnquiry = enquiryCounts[orderNumber] > 0;
 
           const btnClass = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white group-hover:text-slate-800 hover:bg-white/20 group-hover:hover:bg-slate-200 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2";
-          const activeBtnClass = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white bg-blue-600 hover:bg-blue-900 transition-all";
+          const activeBtnClass = "h-6 w-6 inline-flex items-center justify-center rounded-md text-white bg-blue-600 hover:bg-blue-900 transition-all";
 
           return (
             <div className="flex items-center justify-end gap-[1px] h-full w-full">
@@ -1168,7 +1169,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           columnDefs={colDefs}
           rowSelection="multiple"
           rowClass="group"
-          rowHeight={35}
+          rowHeight={27}
           animateRows
           enableCellTextSelection
           onFirstDataRendered={onFirstDataRendered}
@@ -1182,7 +1183,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             resizable: true,
             filter: true,
             minWidth: 40,
-            cellClass: 'px-2 py-1 border border-gray-200 flex items-center justify-center text-center',
+            wrapText: true,
+            autoHeight: true,
+            cellClass: 'px-2 py-1 border border-gray-200 flex items-center justify-center text-center break-words leading-tight',
           }}
           getRowId={p => String(p.data?.id ?? Math.random())}
           getRowClass={() => 'group'}
