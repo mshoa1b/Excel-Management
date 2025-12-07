@@ -14,6 +14,20 @@ class SFTPManager {
     this.isConnected = false;
   }
 
+  async resetConnection() {
+    console.log('Resetting SFTP connection...');
+    try {
+      this.isConnected = false;
+      if (this.sftp) {
+        this.sftp.removeAllListeners();
+        await this.sftp.end();
+      }
+    } catch (e) {
+      console.error('Error ending SFTP connection:', e);
+    }
+    this.sftp = new Client();
+  }
+
   async connect() {
     if (this.isConnected) return;
     try {
@@ -112,55 +126,103 @@ class SFTPManager {
       console.log(`File uploaded successfully: ${filePath}`);
       return filePath;
     } catch (error) {
-      console.error('SFTP upload error details:', {
-        message: error.message,
-        code: error.code,
-        level: error.level,
-        stack: error.stack
-      });
-      throw new Error(`Failed to upload file to SFTP server: ${error.message}`);
+      console.error('SFTP upload error (first attempt):', error.message);
+      
+      try {
+        console.log('Retrying SFTP upload with fresh connection...');
+        await this.resetConnection();
+        await this.connect();
+        
+        const businessDir = this.sftpPath(this.basePath, `business_${businessId}`);
+        const sheetDir = this.sftpPath(businessDir, `sheet_${sheetId}`);
+        
+        await this.ensureDirectory(businessDir);
+        await this.ensureDirectory(sheetDir);
+        
+        const filePath = this.sftpPath(sheetDir, filename);
+        await this.sftp.put(buffer, filePath);
+        
+        console.log(`File uploaded successfully (retry): ${filePath}`);
+        return filePath;
+      } catch (retryError) {
+        console.error('SFTP upload error (second attempt):', retryError);
+        throw new Error(`Failed to upload file to SFTP server: ${retryError.message}`);
+      }
     }
   }
 
   async downloadFile(sftpPath) {
-    await this.connect();
-    
     try {
+      await this.connect();
       const buffer = await this.sftp.get(sftpPath);
       return buffer;
     } catch (error) {
-      console.error('SFTP download error:', error);
-      throw new Error('Failed to download file from SFTP server');
+      console.error('SFTP download error (first attempt):', error.message);
+      
+      try {
+        console.log('Retrying SFTP download with fresh connection...');
+        await this.resetConnection();
+        await this.connect();
+        const buffer = await this.sftp.get(sftpPath);
+        return buffer;
+      } catch (retryError) {
+        console.error('SFTP download error (second attempt):', retryError);
+        throw new Error('Failed to download file from SFTP server');
+      }
     }
   }
 
   async deleteFile(sftpPath) {
-    await this.connect();
-    
     try {
+      await this.connect();
       const exists = await this.sftp.exists(sftpPath);
       if (exists) {
         await this.sftp.delete(sftpPath);
         console.log(`File deleted: ${sftpPath}`);
       }
     } catch (error) {
-      console.error('SFTP delete error:', error);
-      throw new Error('Failed to delete file from SFTP server');
+      console.error('SFTP delete error (first attempt):', error.message);
+      
+      try {
+        console.log('Retrying SFTP delete with fresh connection...');
+        await this.resetConnection();
+        await this.connect();
+        const exists = await this.sftp.exists(sftpPath);
+        if (exists) {
+          await this.sftp.delete(sftpPath);
+          console.log(`File deleted (retry): ${sftpPath}`);
+        }
+      } catch (retryError) {
+        console.error('SFTP delete error (second attempt):', retryError);
+        throw new Error('Failed to delete file from SFTP server');
+      }
     }
   }
 
   async listFiles(dirPath) {
-    await this.connect();
-    
     try {
+      await this.connect();
       const exists = await this.sftp.exists(dirPath);
       if (!exists) return [];
       
       const list = await this.sftp.list(dirPath);
       return list.filter(item => item.type === '-'); // Only files, not directories
     } catch (error) {
-      console.error('SFTP list error:', error);
-      return [];
+      console.error('SFTP list error (first attempt):', error.message);
+      
+      try {
+        console.log('Retrying SFTP list with fresh connection...');
+        await this.resetConnection();
+        await this.connect();
+        const exists = await this.sftp.exists(dirPath);
+        if (!exists) return [];
+        
+        const list = await this.sftp.list(dirPath);
+        return list.filter(item => item.type === '-');
+      } catch (retryError) {
+        console.error('SFTP list error (second attempt):', retryError);
+        return [];
+      }
     }
   }
 

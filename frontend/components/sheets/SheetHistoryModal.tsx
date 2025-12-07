@@ -126,7 +126,7 @@ export function SheetHistoryModal({ businessId, sheetId, currentRow, open, onOpe
     const formatDate = (val?: string) => {
         if (!val || val === 'Current') return val === 'Current' ? 'Current' : '-';
         try {
-            return format(new Date(val), 'yyyy-MM-dd');
+            return format(new Date(val), 'dd-MM-yyyy');
         } catch { return val; }
     };
 
@@ -134,7 +134,7 @@ export function SheetHistoryModal({ businessId, sheetId, currentRow, open, onOpe
         if (val === 'Current') return 'Current';
         try {
             const date = new Date(val);
-            return format(date, 'yyyy-MM-dd HH:mm:ss');
+            return format(date, 'dd-MM-yyyy HH:mm:ss');
         } catch { return val; }
     };
 

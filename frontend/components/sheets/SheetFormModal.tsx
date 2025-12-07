@@ -156,7 +156,7 @@ export function SheetFormModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-[85vw] max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>{initialData ? 'Edit Sheet Record' : 'New Sheet Record'}</DialogTitle>
                 </DialogHeader>
@@ -215,9 +215,9 @@ export function SheetFormModal({
                     )}
 
                     {/* Section 1: Order Info */}
-                    <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-slate-500 border-b pb-1">Order Information</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-4 border rounded-lg p-4 bg-slate-50/50">
+                        <h3 className="text-base font-semibold text-slate-900 border-b pb-2">Order Information</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <div className="space-y-2">
                                 <Label>Order Number {fetchingBM && <Loader2 className="inline h-3 w-3 animate-spin exact" />}</Label>
                                 <Input
@@ -257,8 +257,8 @@ export function SheetFormModal({
                     </div>
 
                     {/* Section 2: Product & Customer */}
-                    <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-slate-500 border-b pb-1">Product & Customer</h3>
+                    <div className="space-y-4 border rounded-lg p-4 bg-slate-50/50">
+                        <h3 className="text-base font-semibold text-slate-900 border-b pb-2">Product & Customer</h3>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-2">
                                 <Label>Customer Name</Label>
@@ -292,9 +292,9 @@ export function SheetFormModal({
                     </div>
 
                     {/* Section 3: Status & Resolution */}
-                    <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-slate-500 border-b pb-1">Status & Resolution</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-4 border rounded-lg p-4 bg-slate-50/50">
+                        <h3 className="text-base font-semibold text-slate-900 border-b pb-2">Status & Resolution</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="space-y-2">
                                 <Label>Status</Label>
                                 <Select value={formData.status} onValueChange={v => handleChange('status', v)}>
@@ -344,9 +344,9 @@ export function SheetFormModal({
                     </div>
 
                     {/* Section 4: Processing */}
-                    <div className="space-y-4">
-                        <h3 className="text-sm font-medium text-slate-500 border-b pb-1">Processing Details</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-4 border rounded-lg p-4 bg-slate-50/50">
+                        <h3 className="text-base font-semibold text-slate-900 border-b pb-2">Processing Details</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <div className="space-y-2">
                                 <Label>Done By</Label>
                                 <Select value={formData.done_by || 'Choose'} onValueChange={v => handleChange('done_by', v)}>
