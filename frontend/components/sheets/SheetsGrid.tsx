@@ -403,6 +403,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               const isPending = !repAvail || (repAvail !== 'Yes' && repAvail !== 'No');
               return isReplacement && isPending;
             }
+            case 'ResolutionPending': {
+              return !row.resolution || row.resolution === 'Choose';
+            }
 
             // Legend Filters
             case 'Legend_Resolved':
@@ -1031,10 +1034,14 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       return isReplacement && isPending;
     }).length;
 
+    const resolutionIsChoose = filteredData.filter(row =>
+      !row.resolution || row.resolution === 'Choose'
+    ).length;
+
     const total = filteredData.length;
     const actionable = unresolved; // Cases that can be worked on (not blocked, not resolved)
 
-    return { blocked, unresolved, resolved, total, actionable, overdue, replacementPending };
+    return { blocked, unresolved, resolved, total, actionable, overdue, replacementPending, resolutionIsChoose };
   }, [filteredData]);
 
 
@@ -1302,6 +1309,19 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                   >
                     <AlertCircle className="h-4 w-4" />
                     <span>Warning for {businessName ?? "Business"}: There are {statusStats.replacementPending} returns with Replacement Available Pending, please review them urgently.</span>
+                  </div>
+                )}
+
+                {statusStats.resolutionIsChoose > 0 && !user?.username?.toLowerCase().startsWith('cs') && (
+                  <div 
+                    onClick={() => toggleFilter('ResolutionPending')}
+                    className={cn(
+                      "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
+                      activeFilter === 'ResolutionPending' ? 'ring-2 ring-red-200 bg-red-100' : ''
+                    )}
+                  >
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Warning for {businessName ?? "Business"}: There are {statusStats.resolutionIsChoose} returns with Resolution Pending, please review them urgently.</span>
                   </div>
                 )}
               </div>
