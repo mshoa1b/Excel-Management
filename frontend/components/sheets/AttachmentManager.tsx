@@ -183,14 +183,14 @@ export function AttachmentManager({ sheetId, onAttachmentChange, attachmentCount
           {/* Upload Area */}
           <div className="space-y-4">
             <div 
-              className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors"
+              className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center hover:border-gray-400 transition-colors"
               onDragOver={handleDragOver}
               onDrop={handleDrop}
             >
-              <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <div className="space-y-2">
-                <p className="text-lg font-medium">Drop files here or click to upload</p>
-                <p className="text-sm text-gray-500">
+              <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+              <div className="space-y-1">
+                <p className="text-base font-medium">Drop files here or click to upload</p>
+                <p className="text-xs text-gray-500">
                   Images, PDFs, and text files up to 50MB each. Maximum 10 files per row.
                 </p>
                 <input

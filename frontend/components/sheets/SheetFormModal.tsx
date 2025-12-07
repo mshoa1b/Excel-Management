@@ -16,6 +16,7 @@ import { Loader2, MessageSquare, History } from 'lucide-react';
 import { AttachmentManager } from './AttachmentManager';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 
 interface SheetFormModalProps {
     open: boolean;
@@ -97,42 +98,48 @@ export function SheetFormModal({
     const isEdit = !!initialData?.id;
 
     const isFieldDisabled = (field: string) => {
-        // System fields (always disabled)
-        // Note: out_of_warranty changed to oow_case to match SheetRecord/backend
-        if (['platform', 'locked', 'oow_case', 'return_within_30_days', 'updated_at'].includes(field))
+        // System always disabled
+        if (['platform', 'updated_at'].includes(field))
             return true;
 
         switch (field) {
-            // Techezm Only (Client cannot edit or add)
+
+            // Techezm-only fields (Client = N)
             case 'order_date':
             case 'sku':
             case 'customer_comment':
-            case 'blocked_by':
-            case 'done_by':
-            case 'resolution': // Techezm-only as requested
+            case 'return_type':
+            case 'cs_comment':
                 return !isTechezm;
 
-            // Techezm Edit-Only fields
+            // Client-only fields (Techezm = N)
+            case 'locked':
+            case 'oow_case':
+            case 'done_by':
+            case 'replacement_available':
+            case 'manager_notes':
+                return isTechezm;
+
+            // Conditional: Techezm Edit-only (Client = N, Techezm Add = N)
+            case 'return_tracking_no':
             case 'refund_amount':
             case 'refund_date':
-            case 'cs_comment':
-            case 'manager_notes':
                 if (!isTechezm) return true;
                 if (!isEdit) return true;
                 return false;
 
-            // Tracking No: Techezm cannot ADD, but can edit
-            case 'return_tracking_no':
-                if (isTechezm && !isEdit) return true;
-                return false;
-
-            // Replacement Available: Clients always allowed, Techezm only allowed when editing
-            case 'replacement_available':
-                if (isTechezm && !isEdit) return true;
+            // Always enabled
+            case 'order_no':
+            case 'date_received':
+            case 'customer_name':
+            case 'imei':
+            case 'status':
+            case 'blocked_by':
+            case 'additional_notes':
                 return false;
 
             default:
-                return false; // open to all by default
+                return false;
         }
     };
 
@@ -147,6 +154,13 @@ export function SheetFormModal({
 
             return next;
         });
+    };
+
+    const getInputClassName = (field: string) => {
+        const disabled = isFieldDisabled(field);
+        return disabled
+            ? "bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed opacity-100 shadow-none"
+            : "bg-white border-slate-300 text-slate-900 shadow-sm focus:border-blue-500 focus:ring-blue-500";
     };
 
     // Auto-fetch Back Market
@@ -265,12 +279,59 @@ export function SheetFormModal({
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <div className="space-y-2">
                                 <Label>Order Number {fetchingBM && <Loader2 className="inline h-3 w-3 animate-spin exact" />}</Label>
-                                <Input
-                                    value={formData.order_no}
-                                    onChange={e => handleChange('order_no', e.target.value)}
-                                    disabled={isFieldDisabled('order_no')}
-                                    placeholder="Order No"
-                                />
+                                <HoverCard openDelay={200}>
+                                    <HoverCardTrigger asChild>
+                                        <Input
+                                            value={formData.order_no}
+                                            onChange={e => handleChange('order_no', e.target.value)}
+                                            disabled={isFieldDisabled('order_no')}
+                                            className={getInputClassName('order_no')}
+                                            placeholder="Order No"
+                                        />
+                                    </HoverCardTrigger>
+                                    <HoverCardContent className="w-80 p-4 bg-white shadow-xl border-slate-200" align="start">
+                                        <div className="space-y-3">
+                                            <h4 className="font-semibold text-sm text-slate-900 border-b pb-2">Quick Details</h4>
+                                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                                <span className="text-slate-500">SKU:</span>
+                                                <span className="font-medium text-slate-900 truncate">{formData.sku || '-'}</span>
+
+                                                <span className="text-slate-500">Customer Comment:</span>
+                                                <span className="font-medium text-slate-900 whitespace-pre-wrap break-words" title={formData.customer_comment}>{formData.customer_comment || '-'}</span>
+
+                                                <span className="text-slate-500">Multiple Return:</span>
+                                                <span className="font-medium text-slate-900">{formData.multiple_return || '-'}</span>
+
+                                                <span className="text-slate-500">Return Type:</span>
+                                                <span className="font-medium text-slate-900">{formData.return_type || '-'}</span>
+
+                                                <span className="text-slate-500">Locked:</span>
+                                                <span className="font-medium text-slate-900">{formData.locked || '-'}</span>
+
+                                                <span className="text-slate-500">OOW Case:</span>
+                                                <span className="font-medium text-slate-900">{formData.oow_case || '-'}</span>
+
+                                                <span className="text-slate-500">Out of Warranty:</span>
+                                                <span className="font-medium text-slate-900">{formData.out_of_warranty || '-'}</span>
+
+                                                <span className="text-slate-500">Replacement Avail:</span>
+                                                <span className="font-medium text-slate-900">{formData.replacement_available || '-'}</span>
+
+                                                <span className="text-slate-500">Return Tracking:</span>
+                                                <span className="font-medium text-slate-900 truncate">{formData.return_tracking_no || '-'}</span>
+
+                                                <span className="text-slate-500">Refund Amount:</span>
+                                                <span className="font-medium text-slate-900">{formData.refund_amount || 0}</span>
+
+                                                <span className="text-slate-500">Refund Date:</span>
+                                                <span className="font-medium text-slate-900">{formData.refund_date ? format(new Date(formData.refund_date), 'dd-MM-yyyy') : '-'}</span>
+
+                                                <span className="text-slate-500">Last Updated:</span>
+                                                <span className="font-medium text-slate-900">{formData.updated_at ? format(new Date(formData.updated_at), 'dd-MM-yyyy HH:mm') : '-'}</span>
+                                            </div>
+                                        </div>
+                                    </HoverCardContent>
+                                </HoverCard>
                             </div>
                             <div className="space-y-2">
                                 <Label>Date Received</Label>
@@ -279,6 +340,7 @@ export function SheetFormModal({
                                     value={formData.date_received}
                                     onChange={e => handleChange('date_received', e.target.value)}
                                     disabled={isFieldDisabled('date_received')}
+                                    className={getInputClassName('date_received')}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -288,11 +350,17 @@ export function SheetFormModal({
                                     value={formData.order_date}
                                     onChange={e => handleChange('order_date', e.target.value)}
                                     disabled={isFieldDisabled('order_date')}
+                                    className={getInputClassName('order_date')}
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label>Platform</Label>
-                                <Input value={formData.platform} readOnly disabled={isFieldDisabled('platform')} className="bg-slate-100" />
+                                <Input 
+                                    value={formData.platform} 
+                                    readOnly 
+                                    disabled={isFieldDisabled('platform')} 
+                                    className={getInputClassName('platform')} 
+                                />
                             </div>
                             <div className="space-y-2">
                                 <Label>Return Tracking No</Label>
@@ -300,6 +368,7 @@ export function SheetFormModal({
                                     value={formData.return_tracking_no}
                                     onChange={e => handleChange('return_tracking_no', e.target.value)}
                                     disabled={isFieldDisabled('return_tracking_no')}
+                                    className={getInputClassName('return_tracking_no')}
                                 />
                             </div>
                         </div>
@@ -315,6 +384,7 @@ export function SheetFormModal({
                                     value={formData.customer_name}
                                     onChange={e => handleChange('customer_name', e.target.value)}
                                     disabled={isFieldDisabled('customer_name')}
+                                    className={getInputClassName('customer_name')}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -323,6 +393,7 @@ export function SheetFormModal({
                                     value={formData.imei}
                                     onChange={e => handleChange('imei', e.target.value)}
                                     disabled={isFieldDisabled('imei')}
+                                    className={getInputClassName('imei')}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -331,6 +402,7 @@ export function SheetFormModal({
                                     value={formData.sku}
                                     onChange={e => handleChange('sku', e.target.value)}
                                     disabled={isFieldDisabled('sku')}
+                                    className={getInputClassName('sku')}
                                 />
                             </div>
                             <div className="col-span-3 space-y-2">
@@ -339,6 +411,7 @@ export function SheetFormModal({
                                     value={formData.customer_comment}
                                     onChange={e => handleChange('customer_comment', e.target.value)}
                                     disabled={isFieldDisabled('customer_comment')}
+                                    className={getInputClassName('customer_comment')}
                                 />
                             </div>
                         </div>
@@ -351,7 +424,7 @@ export function SheetFormModal({
                             <div className="space-y-2">
                                 <Label>Status</Label>
                                 <Select value={formData.status} onValueChange={v => handleChange('status', v)} disabled={isFieldDisabled('status')}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className={getInputClassName('status')}><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Pending">Pending</SelectItem>
                                         <SelectItem value="Resolved">Resolved</SelectItem>
@@ -363,7 +436,7 @@ export function SheetFormModal({
                             <div className="space-y-2">
                                 <Label>Blocked By</Label>
                                 <Select value={formData.blocked_by || 'Choose'} onValueChange={v => handleChange('blocked_by', v === 'Choose' ? '' : v)} disabled={isFieldDisabled('blocked_by')}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className={getInputClassName('blocked_by')}><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {blockedByOptions.map(opt => (
                                             <SelectItem key={opt} value={opt || 'Choose'}>{opt || 'Choose'}</SelectItem>
@@ -374,7 +447,7 @@ export function SheetFormModal({
                             <div className="space-y-2">
                                 <Label>Locked?</Label>
                                 <Select value={formData.locked || 'Choose'} onValueChange={v => handleChange('locked', v)} disabled={isFieldDisabled('locked')}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className={getInputClassName('locked')}><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {lockedOptions.map(opt => (
                                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
@@ -385,7 +458,7 @@ export function SheetFormModal({
                             <div className="space-y-2">
                                 <Label>Out of Warranty?</Label>
                                 <Select value={formData.oow_case || 'Choose'} onValueChange={v => handleChange('oow_case', v)} disabled={isFieldDisabled('oow_case')}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className={getInputClassName('oow_case')}><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {oowOptions.map(opt => (
                                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
@@ -403,7 +476,7 @@ export function SheetFormModal({
                             <div className="space-y-2">
                                 <Label>Done By</Label>
                                 <Select value={formData.done_by || 'Choose'} onValueChange={v => handleChange('done_by', v)} disabled={isFieldDisabled('done_by')}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className={getInputClassName('done_by')}><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {staffOptions.map(opt => (
                                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
@@ -414,7 +487,7 @@ export function SheetFormModal({
                             <div className="space-y-2">
                                 <Label>Return Type</Label>
                                 <Select value={formData.return_type || 'Choose'} onValueChange={v => handleChange('return_type', v)} disabled={isFieldDisabled('return_type')}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className={getInputClassName('return_type')}><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {returnTypeOptions.map(opt => (
                                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
@@ -425,7 +498,7 @@ export function SheetFormModal({
                             <div className="space-y-2">
                                 <Label>Replacement Available</Label>
                                 <Select value={formData.replacement_available || 'Choose'} onValueChange={v => handleChange('replacement_available', v)} disabled={isFieldDisabled('replacement_available')}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectTrigger className={getInputClassName('replacement_available')}><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {yesNoOptions.map(opt => (
                                             <SelectItem key={opt} value={opt}>{opt}</SelectItem>
@@ -440,6 +513,7 @@ export function SheetFormModal({
                                     value={formData.refund_amount}
                                     onChange={e => handleChange('refund_amount', parseFloat(e.target.value))}
                                     disabled={isFieldDisabled('refund_amount')}
+                                    className={getInputClassName('refund_amount')}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -449,12 +523,13 @@ export function SheetFormModal({
                                     value={formData.refund_date}
                                     onChange={e => handleChange('refund_date', e.target.value)}
                                     disabled={isFieldDisabled('refund_date')}
+                                    className={getInputClassName('refund_date')}
                                 />
                             </div>
                             <div className="space-y-2 col-span-2">
                                 <Label>Resolution</Label>
                                 <Select value={formData.resolution || 'Choose'} onValueChange={v => handleChange('resolution', v)} disabled={isFieldDisabled('resolution')}>
-                                    <SelectTrigger><SelectValue placeholder="Choose" /></SelectTrigger>
+                                    <SelectTrigger className={getInputClassName('resolution')}><SelectValue placeholder="Choose" /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Choose">Choose</SelectItem>
                                         <SelectItem value="Refunded">Refunded</SelectItem>
@@ -471,6 +546,7 @@ export function SheetFormModal({
                                 value={formData.cs_comment}
                                 onChange={e => handleChange('cs_comment', e.target.value)}
                                 disabled={isFieldDisabled('cs_comment')}
+                                className={getInputClassName('cs_comment')}
                             />
                         </div>
                         <div className="space-y-2">
@@ -479,6 +555,7 @@ export function SheetFormModal({
                                 value={formData.manager_notes}
                                 onChange={e => handleChange('manager_notes', e.target.value)}
                                 disabled={isFieldDisabled('manager_notes')}
+                                className={getInputClassName('manager_notes')}
                             />
                         </div>
                         <div className="space-y-2">
@@ -487,6 +564,7 @@ export function SheetFormModal({
                                 value={formData.additional_notes}
                                 onChange={e => handleChange('additional_notes', e.target.value)}
                                 disabled={isFieldDisabled('additional_notes')}
+                                className={getInputClassName('additional_notes')}
                             />
                         </div>
                     </div>

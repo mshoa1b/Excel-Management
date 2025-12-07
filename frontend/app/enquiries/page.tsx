@@ -374,7 +374,7 @@ export default function EnquiriesPage() {
                   New Enquiry
                 </Button>
               </DialogTrigger>
-              <DialogContent className="sm:max-w-lg">
+              <DialogContent className="sm:max-w-[75vw] max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                   <DialogTitle>Create New Enquiry</DialogTitle>
                   <DialogDescription>
@@ -382,94 +382,97 @@ export default function EnquiriesPage() {
                   </DialogDescription>
                 </DialogHeader>
                 
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="order_number">Order Number</Label>
-                    <Input
-                      id="order_number"
-                      value={formData.order_number}
-                      onChange={(e) => setFormData(prev => ({ ...prev, order_number: e.target.value }))}
-                      placeholder="Enter order number"
-                    />
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="platform">Platform</Label>
-                    <Select value={formData.platform} onValueChange={(value) => setFormData(prev => ({ ...prev, platform: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select platform" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="amazon">Amazon</SelectItem>
-                        <SelectItem value="backmarket">Backmarket</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="status">Initial Status</Label>
-                    <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select initial status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Awaiting Business">Awaiting {businessName || 'Business'}</SelectItem>
-                        <SelectItem value="Awaiting Techezm">Awaiting Techezm</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder="Describe your enquiry..."
-                      maxLength={2000}
-                      rows={4}
-                    />
-                    <p className="text-xs text-slate-500">
-                      {formData.description.length}/2000 characters
-                    </p>
-                  </div>
-                  
-                  {/* File Upload */}
-                  <div className="space-y-2">
-                    <Label>Attachments</Label>
-                    <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
-                      <input
-                        type="file"
-                        multiple
-                        onChange={handleFileSelect}
-                        className="hidden"
-                        id="file-upload"
-                        accept="image/*,.pdf,.txt"
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="order_number">Order Number</Label>
+                      <Input
+                        id="order_number"
+                        value={formData.order_number}
+                        onChange={(e) => setFormData(prev => ({ ...prev, order_number: e.target.value }))}
+                        placeholder="Enter order number"
                       />
-                      <label htmlFor="file-upload" className="cursor-pointer">
-                        <Upload className="h-8 w-8 mx-auto mb-2 text-slate-400" />
-                        <p className="text-sm text-slate-600">Click to upload files</p>
-                        <p className="text-xs text-slate-400">Images, PDF, and text files only</p>
-                      </label>
                     </div>
                     
-                    {selectedFiles.length > 0 && (
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium">Selected files:</p>
-                        {selectedFiles.map((file, index) => (
-                          <div key={index} className="flex items-center justify-between bg-slate-50 p-2 rounded">
-                            <span className="text-sm truncate">{file.name}</span>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeFile(index)}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
+                    <div className="space-y-2">
+                      <Label htmlFor="platform">Platform</Label>
+                      <Select value={formData.platform} onValueChange={(value) => setFormData(prev => ({ ...prev, platform: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select platform" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="amazon">Amazon</SelectItem>
+                          <SelectItem value="backmarket">Backmarket</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Initial Status</Label>
+                      <Select value={formData.status} onValueChange={(value) => setFormData(prev => ({ ...prev, status: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select initial status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Awaiting Business">Awaiting {businessName || 'Business'}</SelectItem>
+                          <SelectItem value="Awaiting Techezm">Awaiting Techezm</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 flex flex-col">
+                    <div className="space-y-2 flex-1 flex flex-col">
+                      <Label htmlFor="description">Description</Label>
+                      <Textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Describe your enquiry..."
+                        maxLength={2000}
+                        className="resize-none flex-1 min-h-[100px]"
+                      />
+                      <p className="text-xs text-slate-500 text-right">
+                        {formData.description.length}/2000 characters
+                      </p>
+                    </div>
+                    
+                    {/* File Upload */}
+                    <div className="space-y-2">
+                      <Label>Attachments</Label>
+                      <div className="border-2 border-dashed border-slate-300 rounded-lg p-2 text-center hover:bg-slate-50 transition-colors">
+                        <input
+                          type="file"
+                          multiple
+                          onChange={handleFileSelect}
+                          className="hidden"
+                          id="file-upload"
+                          accept="image/*,.pdf,.txt"
+                        />
+                        <label htmlFor="file-upload" className="cursor-pointer flex items-center justify-center gap-2 py-1">
+                          <Upload className="h-4 w-4 text-slate-400" />
+                          <span className="text-sm text-slate-600">Upload files</span>
+                        </label>
                       </div>
-                    )}
+                      
+                      {selectedFiles.length > 0 && (
+                        <div className="max-h-[60px] overflow-y-auto space-y-1 mt-2">
+                          {selectedFiles.map((file, index) => (
+                            <div key={index} className="flex items-center justify-between bg-slate-50 px-2 py-1 rounded text-xs border">
+                              <span className="truncate max-w-[200px]">{file.name}</span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-5 w-5 p-0 hover:bg-slate-200 rounded-full"
+                                onClick={() => removeFile(index)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
@@ -551,7 +554,7 @@ export default function EnquiriesPage() {
                         variant="outline"
                         className="w-full justify-start text-left font-normal px-3"
                       >
-                        {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'Start date'}
+                        {dateFrom ? format(dateFrom, 'dd-MM-yyyy') : 'Start date'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -577,7 +580,7 @@ export default function EnquiriesPage() {
                         variant="outline"
                         className="w-full justify-start text-left font-normal px-3"
                       >
-                        {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'End date'}
+                        {dateTo ? format(dateTo, 'dd-MM-yyyy') : 'End date'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -695,7 +698,7 @@ export default function EnquiriesPage() {
                         <TableCell>
                           <div className="flex items-center space-x-2">
                             
-                            <span>{format(new Date(enquiry.enquiry_date), 'dd/MM/yyyy')}</span>
+                            <span>{format(new Date(enquiry.enquiry_date), 'dd-MM-yyyy')}</span>
                           </div>
                         </TableCell>
                         <TableCell>{enquiry.created_by_username || 'Unknown'}</TableCell>

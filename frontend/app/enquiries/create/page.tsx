@@ -236,7 +236,7 @@ export default function CreateEnquiryPage() {
               {/* File Upload */}
               <div className="space-y-2">
                 <Label>Attachments (Optional)</Label>
-                <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
+                <div className="border-2 border-dashed border-slate-300 rounded-lg py-2 px-4 text-center">
                   <input
                     type="file"
                     multiple
@@ -245,9 +245,9 @@ export default function CreateEnquiryPage() {
                     id="file-upload"
                     accept="image/*,.pdf,.txt"
                   />
-                  <label htmlFor="file-upload" className="cursor-pointer">
-                    <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-                    <p className="text-sm text-slate-600 mb-1">Click to select files or drag and drop</p>
+                  <label htmlFor="file-upload" className="cursor-pointer flex flex-col items-center justify-center">
+                    <Upload className="h-5 w-5 text-slate-400 mb-1" />
+                    <p className="text-sm text-slate-600 mb-0">Click to select files or drag and drop</p>
                     <p className="text-xs text-slate-400">Images, PDF, and text files only (max 10MB each)</p>
                   </label>
                 </div>
@@ -295,7 +295,7 @@ export default function CreateEnquiryPage() {
           </Card>
 
           <Dialog open={showModal} onOpenChange={setShowModal}>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[600px]">
               <DialogHeader>
                 <DialogTitle>Confirm Enquiry Creation</DialogTitle>
                 <DialogDescription>
@@ -303,8 +303,8 @@ export default function CreateEnquiryPage() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
+              <div className="space-y-3 py-2">
+                <div className="space-y-1">
                   <Label htmlFor="modal-status">Initial Status</Label>
                   <Select
                     value={formData.status}

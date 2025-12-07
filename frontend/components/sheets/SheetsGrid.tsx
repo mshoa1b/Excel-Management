@@ -22,11 +22,15 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History, Pencil } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AttachmentManager } from './AttachmentManager';
 import { SheetHistoryModal } from './SheetHistoryModal';
 import { SheetFormModal } from './SheetFormModal';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 import { blockedByOptions, MULTILINE_COLS } from './constants';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
@@ -208,6 +212,7 @@ const colorForRow = (r?: SheetRecord): string => {
 /** ==================================== **/
 
 export default function SheetsGrid({ businessId }: { businessId: string }) {
+  const [isHeaderExpanded, setIsHeaderExpanded] = useState(true);
   const { formatCurrency } = useCurrency(businessId);
   const apiRef = useRef<GridApi<SheetRecord> | null>(null);
   const [rowData, setRowData] = useState<SheetRecord[]>([]);
@@ -238,7 +243,12 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   // Enquiry handling functions
   const checkExistingEnquiry = async (orderNumber: string) => {
     try {
-      const enquiries = await apiClient.request(`/enquiries?order_number=${encodeURIComponent(orderNumber)}`);
+      const response = await apiClient.request(`/enquiries?order_number=${encodeURIComponent(orderNumber)}`);
+      // Handle paginated response structure
+      const enquiries = response.data || response;
+      
+      if (!Array.isArray(enquiries)) return null;
+
       // Find exact match (the backend does partial match, so we filter here)
       return enquiries.find((e: any) => e.order_number === orderNumber) || null;
     } catch (error) {
@@ -736,7 +746,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   // Remove custom DateCellEditor - using ag-Grid's built-in agDateStringCellEditor instead
 
   // Formatters and parsers
-  const dateFormatter = (p: any) => (p.value ? format(new Date(p.value), 'dd/MM/yyyy') : '');
+  const dateFormatter = (p: any) => (p.value ? format(new Date(p.value), 'dd-MM-yyyy') : '');
   const dateParser = (p: any) => {
     // If newValue is null, undefined, or empty string, allow clearing the date
     if (p.newValue == null || p.newValue === '') {
@@ -771,7 +781,69 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         suppressSizeToFit: true
       },
       { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, hide: true },
-      { headerName: 'Order Number', field: 'order_no', editable: false, pinned: 'left', minWidth: 150 },
+      {
+        headerName: 'Order Number',
+        field: 'order_no',
+        editable: false,
+        pinned: 'left',
+        minWidth: 150,
+        cellRenderer: (params: any) => {
+          const row = params.data;
+          if (!row || !params.value) return null;
+
+          return (
+            <HoverCard openDelay={200}>
+              <HoverCardTrigger asChild>
+                <span className="cursor-pointer hover:text-blue-600 hover:underline decoration-dotted underline-offset-4 transition-colors block w-full h-full">
+                  {params.value}
+                </span>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-80 p-4 bg-white shadow-xl border-slate-200 z-[9999]" align="start">
+                <div className="space-y-3">
+                  <h4 className="font-semibold text-sm text-slate-900 border-b pb-2">Quick Details</h4>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                    <span className="text-slate-500">SKU:</span>
+                    <span className="font-medium text-slate-900 truncate">{row.sku || '-'}</span>
+
+                    <span className="text-slate-500">Customer Comment:</span>
+                    <span className="font-medium text-slate-900 whitespace-pre-wrap break-words" title={row.customer_comment}>{row.customer_comment || '-'}</span>
+
+                    <span className="text-slate-500">Multiple Return:</span>
+                    <span className="font-medium text-slate-900">{row.multiple_return || '-'}</span>
+
+                    <span className="text-slate-500">Return Type:</span>
+                    <span className="font-medium text-slate-900">{row.return_type || '-'}</span>
+
+                    <span className="text-slate-500">Locked:</span>
+                    <span className="font-medium text-slate-900">{row.locked || '-'}</span>
+
+                    <span className="text-slate-500">OOW Case:</span>
+                    <span className="font-medium text-slate-900">{row.oow_case || '-'}</span>
+
+                    <span className="text-slate-500">Out of Warranty:</span>
+                    <span className="font-medium text-slate-900">{row.out_of_warranty || '-'}</span>
+
+                    <span className="text-slate-500">Replacement Avail:</span>
+                    <span className="font-medium text-slate-900">{row.replacement_available || '-'}</span>
+
+                    <span className="text-slate-500">Return Tracking:</span>
+                    <span className="font-medium text-slate-900 truncate">{row.return_tracking_no || '-'}</span>
+
+                    <span className="text-slate-500">Refund Amount:</span>
+                    <span className="font-medium text-slate-900">{typeof row.refund_amount === 'number' ? formatCurrency(row.refund_amount) : formatCurrency(0)}</span>
+
+                    <span className="text-slate-500">Refund Date:</span>
+                    <span className="font-medium text-slate-900">{row.refund_date ? format(new Date(row.refund_date), 'dd-MM-yyyy') : '-'}</span>
+
+                    <span className="text-slate-500">Last Updated:</span>
+                    <span className="font-medium text-slate-900">{row.updated_at ? format(new Date(row.updated_at), 'dd-MM-yyyy HH:mm') : '-'}</span>
+                  </div>
+                </div>
+              </HoverCardContent>
+            </HoverCard>
+          );
+        }
+      },
       { headerName: 'Blocked By', field: 'blocked_by', editable: false, pinned: 'left' },
       
       { headerName: 'Date Received', field: 'date_received', editable: false, valueFormatter: dateFormatter, },
@@ -815,7 +887,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         cellClass: 'p-0 flex items-center justify-center',
         cellRenderer: (p: any) => {
           const orderNumber = p.data?.order_no;
-          const platform = computePlatform(p.data);
+          const computedPlatform = computePlatform(p.data?.order_no || '');
+          const platform = computedPlatform === 'Back Market' ? 'backmarket' : 'amazon';
           const hasEnquiry = enquiryCounts[orderNumber] > 0;
 
           const btnClass = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white group-hover:text-slate-800 hover:bg-white/20 group-hover:hover:bg-slate-200 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2";
@@ -945,205 +1018,244 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
 
   return (
-    <div className="flex flex-col space-y-3 p-4 bg-white rounded-lg shadow-md">
-      {/* Filters Row */}
-      <div className="flex items-center justify-between mb-3 p-3 bg-gray-50 rounded-lg">
-        <div className="flex items-center gap-4">
-          {/* Date Range Filter */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Calendar className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground font-medium">Date Range:</span>
-            </div>
-            <span className="text-sm text-muted-foreground">From:</span>
-            <Input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="w-36"
-            />
-            <span className="text-sm text-muted-foreground">To:</span>
-            <Input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="w-36"
-            />
-            {isDateFiltered && (
-              <Button variant="outline" size="sm" onClick={clearDateFilter}>
-                Clear
-              </Button>
-            )}
-          </div>
-
-          {/* Platform Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground font-medium">Platform:</span>
-            <Select value={platformFilter} onValueChange={setPlatformFilter}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All</SelectItem>
-                <SelectItem value="Amazon">Amazon</SelectItem>
-                <SelectItem value="Back Market">Back Market</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by Order Number or Customer Name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 w-80"
-          />
-        </div>
-      </div>
-
-      {/* Status Stats */}
-      <div className="mb-2 p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border">
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-gray-700">Status Overview</h3>
-          <span className="text-xs text-gray-500">Click tiles to filter</span>
-        </div>
-        {statusStats.overdue > 0 && (
-          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm font-medium flex items-center gap-2">
-            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-            There are {statusStats.overdue} returns received more than 14 days ago. Please review them urgently.
-          </div>
-        )}
-        <div className="flex flex-wrap gap-3">
-          <div
-            onClick={() => toggleFilter('Blocked')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md shadow-sm border cursor-pointer transition-all ${activeFilter === 'Blocked' ? 'ring-2 ring-red-500 ring-offset-1 bg-red-100' : 'bg-red-50 border-red-100 hover:bg-red-100'
-              }`}
-          >
-            <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            <span className="text-red-700 font-medium text-sm">Blocked:</span>
-            <span className="text-lg font-bold text-red-800">{statusStats.blocked}</span>
-
-          </div>
-          <div
-            onClick={() => toggleFilter('Actionable')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md shadow-sm border cursor-pointer transition-all ${activeFilter === 'Actionable' ? 'ring-2 ring-yellow-500 ring-offset-1 bg-yellow-100' : 'bg-yellow-50 border-yellow-100 hover:bg-yellow-100'
-              }`}
-          >
-            <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-            <span className="text-yellow-700 font-medium text-sm">Actionable:</span>
-            <span className="text-lg font-bold text-yellow-800">{statusStats.actionable}</span>
-          </div>
-          <div
-            onClick={() => toggleFilter('Resolved')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md shadow-sm border cursor-pointer transition-all ${activeFilter === 'Resolved' ? 'ring-2 ring-green-500 ring-offset-1 bg-green-100' : 'bg-green-50 border-green-100 hover:bg-green-100'
-              }`}
-          >
-            <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-            <span className="text-green-700 font-medium text-sm">Resolved:</span>
-            <span className="text-lg font-bold text-green-800">{statusStats.resolved}</span>
-          </div>
-          
-          <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-md shadow-sm border border-blue-100">
-            <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-            <span className="text-blue-700 font-medium text-sm">Total:</span>
-            <span className="text-lg font-bold text-blue-800">{statusStats.total}</span>
-          </div>
-          {statusStats.total > 0 && (
-            <div className="flex items-center gap-2 bg-slate-50 px-3 py-2 rounded-md shadow-sm border border-slate-100">
-              <div className="w-3 h-3 bg-slate-500 rounded-full"></div>
-              <span className="text-slate-700 font-medium text-sm">Progress:</span>
-              <span className="text-lg font-bold text-slate-800">
-                {Math.round((statusStats.resolved / statusStats.total) * 100)}%
-              </span>
-            </div>
-          )}
-          <div
-            onClick={() => toggleFilter('Overdue')}
-            className={`ml-auto flex items-center gap-2 px-3 py-2 rounded-md shadow-sm border cursor-pointer transition-all ${activeFilter === 'Overdue' ? 'ring-2 ring-red-500 ring-offset-1 bg-red-700 text-white' : 'bg-red-600 border-red-600 text-white hover:bg-red-700'
-              }`}
-          >
-            <div className="w-3 h-3 bg-white rounded-full"></div>
-            <span className="font-medium text-sm text-white">Received 14+ Days:</span>
-            <span className="text-lg font-bold text-white">{statusStats.overdue}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Buttons Row */}
-      <div className="flex items-center gap-2 mb-2">
-        <Button className="gap-2" onClick={addRow}><Plus /> New Row</Button>
-        <Button variant="outline" className="gap-2" onClick={removeSelected}><Trash2 /> Delete Selected</Button>
-        <Button variant="outline" className="gap-2" onClick={handleHistoryClick}><History /> History</Button>
-        <Button variant="outline" className="gap-2" onClick={refresh}><RotateCcw /> Refresh</Button>
-        <Button
-          variant="outline"
-          className="gap-2 ml-auto"
-          onClick={() => {
-            const ws = XLSX.utils.json_to_sheet(filteredData.map(row => ({
-              ...row,
-              // Format dates for Excel
-              date_received: row.date_received ? format(new Date(row.date_received), 'dd/MM/yyyy') : '',
-              order_date: row.order_date ? format(new Date(row.order_date), 'dd/MM/yyyy') : '',
-              refund_date: row.refund_date ? format(new Date(row.refund_date), 'dd/MM/yyyy') : '',
-              updated_at: row.updated_at ? format(new Date(row.updated_at), 'dd/MM/yyyy HH:mm') : ''
-            })));
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Sheets");
-            XLSX.writeFile(wb, `sheets_export_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`);
-          }}
-        >
-          <Download className="h-4 w-4" /> Download XLS
+    <div className="flex flex-col space-y-2 p-2 bg-white rounded-lg shadow-md">
+      {/* Header Toggle Bar */}
+      <div className="flex items-center justify-between px-2 py-1 bg-gray-100 rounded-t-lg border-b cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}>
+        <span className="text-sm font-semibold text-gray-700">Controls & Stats</span>
+        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+          {isHeaderExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </Button>
       </div>
 
-      {/* Marketplace totals for today */}
-      <div className="flex flex-wrap gap-4 text-gray-800 font-medium mb-2">
-        <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-md shadow-sm">
-          <span className="text-blue-700 font-semibold">Amazon Refunds (Today):</span>
-          <span className="text-lg font-bold text-blue-800">{formatCurrency(totals.amazon)}</span>
-        </div>
-        <div className="flex items-center gap-2 bg-green-50 px-3 py-2 rounded-md shadow-sm">
-          <span className="text-green-700 font-semibold">Back Market Refunds (Today):</span>
-          <span className="text-lg font-bold text-green-800">{formatCurrency(totals.backmarket)}</span>
-        </div>
-        <div className="flex items-center gap-2 bg-slate-100 px-3 py-2 rounded-md shadow-sm">
-          <span className="text-slate-700 font-semibold">Total Refunds (All Marketplaces):</span>
-          <span className="text-lg font-bold text-slate-900">{formatCurrency(totals.total)}</span>
-        </div>
-      </div>
+      {/* Collapsible Header Content */}
+      {isHeaderExpanded && (
+        <div className="flex flex-col space-y-2 p-2 bg-gray-50 rounded-b-lg border border-t-0 animate-in slide-in-from-top-2 duration-200">
+          {/* Top Controls Bar: Filters + Search + Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Date Range Filter */}
+              <div className="flex items-center gap-1">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-[13px] text-muted-foreground font-medium">Date:</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      size="sm"
+                      className={cn(
+                        "w-36 h-9 text-[13px] justify-start text-left font-normal px-2",
+                        !dateFrom && "text-muted-foreground"
+                      )}
+                    >
+                      {dateFrom ? format(new Date(dateFrom), "dd-MM-yyyy") : <span>From</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={dateFrom ? new Date(dateFrom) : undefined}
+                      onSelect={(d) => setDateFrom(d ? format(d, 'yyyy-MM-dd') : '')}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
 
-      {/* Interactive Legend */}
-      <div className="flex flex-wrap gap-2 text-xs mb-2">
-        {[
-          ['#166534', 'Resolved', 'Legend_Resolved'],
-          ['#F59E0B', 'Awaiting Customer/BM', 'Legend_Awaiting Customer/BM'],
-          ['#1D4ED8', 'Awaiting G&I', 'Legend_Awaiting G&I'],
-          ['#F97316', 'Awaiting Techezm', 'Legend_Awaiting Techezm'],
-          ['#DB2777', 'Awaiting Replacement', 'Legend_Awaiting Replacement'],
-          ['#6B7280', 'Blocked', 'Legend_Blocked'],
-          ['#DC2626', 'Locked', 'Legend_Locked'],
-          ['#B45309', 'OOW', 'Legend_OOW'],
-          ['#22C55E', 'Unresolved', 'Legend_Unresolved'],
+                <span className="text-[13px] text-muted-foreground">-</span>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      size="sm"
+                      className={cn(
+                        "w-36 h-9 text-[13px] justify-start text-left font-normal px-2",
+                        !dateTo && "text-muted-foreground"
+                      )}
+                    >
+                      {dateTo ? format(new Date(dateTo), "dd-MM-yyyy") : <span>To</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={dateTo ? new Date(dateTo) : undefined}
+                      onSelect={(d) => setDateTo(d ? format(d, 'yyyy-MM-dd') : '')}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                {isDateFiltered && (
+                  <Button variant="ghost" size="sm" onClick={clearDateFilter} className="h-9 w-9 p-0">
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
 
-        ].map(([hex, label, filterKey]) => (
-          <div
-            key={hex}
-            onClick={() => toggleFilter(filterKey)}
-            className={`flex items-center gap-2 px-2 py-1 rounded border cursor-pointer transition-all ${activeFilter === filterKey
-              ? 'ring-2 ring-offset-1 ring-gray-400 bg-gray-100'
-              : 'hover:bg-gray-50'
-              }`}
-          >
-            <span style={{ backgroundColor: hex, width: 14, height: 14, borderRadius: 3 }} />
-            <span>{label}</span>
+              {/* Platform Filter */}
+              <div className="flex items-center gap-1">
+                <span className="text-[13px] text-muted-foreground font-medium">Platform:</span>
+                <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                  <SelectTrigger className="w-36 h-9 text-[13px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All</SelectItem>
+                    <SelectItem value="Amazon">Amazon</SelectItem>
+                    <SelectItem value="Back Market">Back Market</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search Order/Customer..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-60 h-9 text-[13px]"
+                />
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-1">
+              <Button size="sm" className="h-9 text-[13px] gap-1" onClick={addRow}><Plus className="h-4 w-4" /> New</Button>
+              <Button variant="outline" size="sm" className="h-9 text-[13px] gap-1" onClick={removeSelected}><Trash2 className="h-4 w-4" /> Delete</Button>
+              <Button variant="outline" size="sm" className="h-9 text-[13px] gap-1" onClick={handleHistoryClick}><History className="h-4 w-4" /> History</Button>
+              <Button variant="outline" size="sm" className="h-9 text-[13px] gap-1" onClick={refresh}><RotateCcw className="h-4 w-4" /> Refresh</Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-9 text-[13px] gap-1"
+                onClick={() => {
+                  const ws = XLSX.utils.json_to_sheet(filteredData.map(row => ({
+                    ...row,
+                    date_received: row.date_received ? format(new Date(row.date_received), 'dd/MM/yyyy') : '',
+                    order_date: row.order_date ? format(new Date(row.order_date), 'dd/MM/yyyy') : '',
+                    refund_date: row.refund_date ? format(new Date(row.refund_date), 'dd/MM/yyyy') : '',
+                    updated_at: row.updated_at ? format(new Date(row.updated_at), 'dd/MM/yyyy HH:mm') : ''
+                  })));
+                  const wb = XLSX.utils.book_new();
+                  XLSX.utils.book_append_sheet(wb, ws, "Sheets");
+                  XLSX.writeFile(wb, `sheets_export_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`);
+                }}
+              >
+                <Download className="h-4 w-4" /> XLS
+              </Button>
+            </div>
           </div>
-        ))}
-      </div>
 
-      <div className="ag-theme-alpine" style={{ width: '100%', height: '75vh', borderRadius: '0.5rem' }}>
+          {/* Stats Row: Status + Marketplace */}
+          <div className="flex flex-col gap-2 p-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border">
+            {statusStats.overdue > 0 && (
+              <div className="px-2 py-1 bg-red-50 border border-red-200 rounded text-red-700 text-[13px] font-medium flex items-center gap-2">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                {statusStats.overdue} returns received 14+ days ago. Please review urgently.
+              </div>
+            )}
+            
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap gap-2">
+                <div
+                  onClick={() => toggleFilter('Blocked')}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-all ${activeFilter === 'Blocked' ? 'ring-1 ring-red-500 bg-red-100' : 'bg-red-50 border-red-100 hover:bg-red-100'}`}
+                >
+                  <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
+                  <span className="text-red-700 font-medium text-[13px]">Blocked:</span>
+                  <span className="text-[15px] font-bold text-red-800">{statusStats.blocked}</span>
+                </div>
+                <div
+                  onClick={() => toggleFilter('Actionable')}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-all ${activeFilter === 'Actionable' ? 'ring-1 ring-yellow-500 bg-yellow-100' : 'bg-yellow-50 border-yellow-100 hover:bg-yellow-100'}`}
+                >
+                  <div className="w-2.5 h-2.5 bg-yellow-500 rounded-full"></div>
+                  <span className="text-yellow-700 font-medium text-[13px]">Actionable:</span>
+                  <span className="text-[15px] font-bold text-yellow-800">{statusStats.actionable}</span>
+                </div>
+                <div
+                  onClick={() => toggleFilter('Resolved')}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-all ${activeFilter === 'Resolved' ? 'ring-1 ring-green-500 bg-green-100' : 'bg-green-50 border-green-100 hover:bg-green-100'}`}
+                >
+                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
+                  <span className="text-green-700 font-medium text-[13px]">Resolved:</span>
+                  <span className="text-[15px] font-bold text-green-800">{statusStats.resolved}</span>
+                </div>
+                
+                <div className="flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded border border-blue-100">
+                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
+                  <span className="text-blue-700 font-medium text-[13px]">Total:</span>
+                  <span className="text-[15px] font-bold text-blue-800">{statusStats.total}</span>
+                </div>
+                {statusStats.total > 0 && (
+                  <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded border border-slate-100">
+                    <div className="w-2.5 h-2.5 bg-slate-500 rounded-full"></div>
+                    <span className="text-slate-700 font-medium text-[13px]">Progress:</span>
+                    <span className="text-[15px] font-bold text-slate-800">
+                      {Math.round((statusStats.resolved / statusStats.total) * 100)}%
+                    </span>
+                  </div>
+                )}
+                <div
+                  onClick={() => toggleFilter('Overdue')}
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-all ${activeFilter === 'Overdue' ? 'ring-1 ring-red-500 bg-red-700 text-white' : 'bg-red-600 border-red-600 text-white hover:bg-red-700'}`}
+                >
+                  <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
+                  <span className="font-medium text-[13px] text-white">14+ Days:</span>
+                  <span className="text-[15px] font-bold text-white">{statusStats.overdue}</span>
+                </div>
+              </div>
+
+              {/* Marketplace Totals */}
+              <div className="flex items-center gap-3 text-[13px] ml-auto">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-blue-700 font-medium">Amazon (Today):</span>
+                  <span className="font-bold text-blue-800">{formatCurrency(totals.amazon)}</span>
+                </div>
+                <div className="w-px h-3 bg-gray-300"></div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-green-700 font-medium">BM (Today):</span>
+                  <span className="font-bold text-green-800">{formatCurrency(totals.backmarket)}</span>
+                </div>
+                <div className="w-px h-3 bg-gray-300"></div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-slate-700 font-medium">Total:</span>
+                  <span className="font-bold text-slate-900">{formatCurrency(totals.total)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Legend */}
+          <div className="flex flex-wrap gap-2 text-[11px] mb-0">
+            {[
+              ['#166534', 'Resolved', 'Legend_Resolved'],
+              ['#F59E0B', 'Awaiting Customer/BM', 'Legend_Awaiting Customer/BM'],
+              ['#1D4ED8', 'Awaiting G&I', 'Legend_Awaiting G&I'],
+              ['#F97316', 'Awaiting Techezm', 'Legend_Awaiting Techezm'],
+              ['#DB2777', 'Awaiting Replacement', 'Legend_Awaiting Replacement'],
+              ['#6B7280', 'Blocked', 'Legend_Blocked'],
+              ['#DC2626', 'Locked', 'Legend_Locked'],
+              ['#B45309', 'OOW', 'Legend_OOW'],
+              ['#22C55E', 'Unresolved', 'Legend_Unresolved'],
+
+            ].map(([hex, label, filterKey]) => (
+              <div
+                key={hex}
+                onClick={() => toggleFilter(filterKey)}
+                className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded border cursor-pointer transition-all ${activeFilter === filterKey
+                  ? 'ring-1 ring-gray-400 bg-gray-100'
+                  : 'hover:bg-gray-50'
+                  }`}
+              >
+                <span style={{ backgroundColor: hex, width: 12, height: 12, borderRadius: 2 }} />
+                <span>{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="ag-theme-alpine" style={{ width: '100%', height: isHeaderExpanded ? '65vh' : '85vh', borderRadius: '0.5rem' }}>
         <AgGridReact<SheetRecord>
           onGridReady={onGridReady}
           rowData={filteredData}
