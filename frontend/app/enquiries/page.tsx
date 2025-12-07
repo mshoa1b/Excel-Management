@@ -45,7 +45,11 @@ import {
   X,
   Search,
   CalendarDays,
-  Filter
+  Filter,
+  ChevronLeft,
+  ChevronRight,
+  ShoppingCart,
+  Store
 } from 'lucide-react';
 
 interface Enquiry {
@@ -61,6 +65,8 @@ interface Enquiry {
   created_by_username?: string;
   created_at: string;
   updated_at: string;
+  last_update_at?: string;
+  last_update_by?: string;
 }
 
 export default function EnquiriesPage() {
@@ -72,12 +78,18 @@ export default function EnquiriesPage() {
   const [newEnquiryOpen, setNewEnquiryOpen] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(20);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+
   // Search and filter state
   const [searchOrderNumber, setSearchOrderNumber] = useState('');
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
   const [platformFilter, setPlatformFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('active'); // Default to non-resolved + recent resolved
+  const [statusFilter, setStatusFilter] = useState<string>('active'); // Default to non-resolved (Awaiting...)
   const [dateFromOpen, setDateFromOpen] = useState(false);
   const [dateToOpen, setDateToOpen] = useState(false);
   
@@ -89,13 +101,15 @@ export default function EnquiriesPage() {
     status: 'Awaiting Business' // Default status
   });
 
-  // Calculate stats from current enquiries
-  const stats = {
-    resolved: enquiries.filter(e => e.status === 'Resolved').length,
-    awaitingBusiness: enquiries.filter(e => e.status === 'Awaiting Business').length,
-    awaitingTechezm: enquiries.filter(e => e.status === 'Awaiting Techezm').length,
-    total: enquiries.length
-  };
+  // Stats state
+  const [stats, setStats] = useState({
+    resolved: 0,
+    awaitingBusiness: 0,
+    awaitingTechezm: 0,
+    amazon: 0,
+    backmarket: 0,
+    total: 0
+  });
 
   useEffect(() => {
     loadEnquiries();
@@ -109,7 +123,7 @@ export default function EnquiriesPage() {
       }, 300); // Debounce search
       return () => clearTimeout(timeoutId);
     }
-  }, [searchOrderNumber, dateFrom, dateTo, platformFilter, statusFilter]);
+  }, [searchOrderNumber, dateFrom, dateTo, platformFilter, statusFilter, page, limit]);
 
   const loadEnquiries = async () => {
     if (loadingRef.current) return; // Prevent concurrent requests
@@ -121,6 +135,9 @@ export default function EnquiriesPage() {
       // Build query parameters
       const params = new URLSearchParams();
       
+      params.append('page', page.toString());
+      params.append('limit', limit.toString());
+
       if (searchOrderNumber.trim()) {
         params.append('order_number', searchOrderNumber.trim());
       }
@@ -144,8 +161,29 @@ export default function EnquiriesPage() {
       const queryString = params.toString();
       const endpoint = queryString ? `/enquiries?${queryString}` : '/enquiries';
       
-      const data = await apiClient.request(endpoint);
-      setEnquiries(data);
+      const response = await apiClient.request(endpoint);
+      
+      if (response.pagination) {
+        setEnquiries(response.data);
+        setTotalItems(response.pagination.total);
+        setTotalPages(response.pagination.totalPages);
+        if (response.stats) {
+          setStats(response.stats);
+        }
+      } else {
+        setEnquiries(response);
+        setTotalItems(response.length);
+        setTotalPages(1);
+        // Fallback stats calculation for non-paginated response (should not happen with updated backend)
+        setStats({
+          resolved: response.filter((e: Enquiry) => e.status === 'Resolved').length,
+          awaitingBusiness: response.filter((e: Enquiry) => e.status === 'Awaiting Business').length,
+          awaitingTechezm: response.filter((e: Enquiry) => e.status === 'Awaiting Techezm').length,
+          amazon: response.filter((e: Enquiry) => e.platform === 'amazon').length,
+          backmarket: response.filter((e: Enquiry) => e.platform === 'backmarket').length,
+          total: response.length
+        });
+      }
     } catch (error) {
       console.error('Failed to load enquiries:', error);
     } finally {
@@ -284,9 +322,9 @@ export default function EnquiriesPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Awaiting Business':
-        return 'bg-orange-100 text-orange-800';
-      case 'Awaiting Techezm':
         return 'bg-blue-100 text-blue-800';
+      case 'Awaiting Techezm':
+        return 'bg-orange-100 text-orange-800';
       case 'Resolved':
         return 'bg-green-100 text-green-800';
       default:
@@ -456,141 +494,179 @@ export default function EnquiriesPage() {
               </CardTitle>
               
               {/* Search and Filters */}
-              <div className="mt-4 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Order Number Search */}
-                  <div className="space-y-2">
-                    <Label htmlFor="search">Order Number</Label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input
-                        id="search"
-                        placeholder="Search by order number..."
-                        value={searchOrderNumber}
-                        onChange={(e) => setSearchOrderNumber(e.target.value)}
-                        className="pl-10"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Platform Filter */}
-                  <div className="space-y-2">
-                    <Label>Platform</Label>
-                    <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Platforms</SelectItem>
-                        <SelectItem value="amazon">Amazon</SelectItem>
-                        <SelectItem value="backmarket">Backmarket</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Status Filter */}
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="active">Active (Default)</SelectItem>
-                        <SelectItem value="all">All Enquiries</SelectItem>
-                        <SelectItem value="awaiting_business">Awaiting {businessName || 'Business'}</SelectItem>
-                        <SelectItem value="awaiting_techezm">Awaiting Techezm</SelectItem>
-                        <SelectItem value="resolved">Resolved</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Clear Filters Button */}
-                  <div className="space-y-2">
-                    <Label className="invisible">Clear</Label>
-                    <Button variant="outline" onClick={clearFilters} className="w-full">
-                      <X className="h-4 w-4 mr-2" />
-                      Clear Filters
-                    </Button>
+              <div className="mt-4 flex flex-wrap items-end gap-4">
+                {/* Order Number Search */}
+                <div className="space-y-2 flex-1 min-w-[200px]">
+                  <Label htmlFor="search">Order Number</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      id="search"
+                      placeholder="Search..."
+                      value={searchOrderNumber}
+                      onChange={(e) => setSearchOrderNumber(e.target.value)}
+                      className="pl-10"
+                    />
                   </div>
                 </div>
 
-                {/* Date Range Filters */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* Date From */}
-                  <div className="space-y-2">
-                    <Label>Date From</Label>
-                    <Popover open={dateFromOpen} onOpenChange={setDateFromOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                        >
-                          
-                          {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'Select start date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={dateFrom}
-                          onSelect={(date) => {
-                            setDateFrom(date);
-                            setDateFromOpen(false);
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                {/* Platform Filter */}
+                <div className="space-y-2 w-[150px]">
+                  <Label>Platform</Label>
+                  <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="amazon">Amazon</SelectItem>
+                      <SelectItem value="backmarket">Backmarket</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-                  {/* Date To */}
-                  <div className="space-y-2">
-                    <Label>Date To</Label>
-                    <Popover open={dateToOpen} onOpenChange={setDateToOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start text-left font-normal"
-                        >
-                          
-                          {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'Select end date'}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={dateTo}
-                          onSelect={(date) => {
-                            setDateTo(date);
-                            setDateToOpen(false);
-                          }}
-                          initialFocus
-                        />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
+                {/* Status Filter */}
+                <div className="space-y-2 w-[180px]">
+                  <Label>Status</Label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="awaiting_business">Awaiting {businessName || 'Business'}</SelectItem>
+                      <SelectItem value="awaiting_techezm">Awaiting Techezm</SelectItem>
+                      <SelectItem value="resolved">Resolved</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Date From */}
+                <div className="space-y-2 w-[160px]">
+                  <Label>Date From</Label>
+                  <Popover open={dateFromOpen} onOpenChange={setDateFromOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal px-3"
+                      >
+                        {dateFrom ? format(dateFrom, 'dd/MM/yyyy') : 'Start date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateFrom}
+                        onSelect={(date) => {
+                          setDateFrom(date);
+                          setDateFromOpen(false);
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Date To */}
+                <div className="space-y-2 w-[160px]">
+                  <Label>Date To</Label>
+                  <Popover open={dateToOpen} onOpenChange={setDateToOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left font-normal px-3"
+                      >
+                        {dateTo ? format(dateTo, 'dd/MM/yyyy') : 'End date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateTo}
+                        onSelect={(date) => {
+                          setDateTo(date);
+                          setDateToOpen(false);
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                {/* Clear Filters Button */}
+                <div className="pb-0.5">
+                  <Button variant="outline" onClick={clearFilters} title="Clear Filters">
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               </div>
               
               {/* Stats Section */}
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-slate-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-slate-700">{stats.total}</div>
-                  <div className="text-sm text-slate-500">Total Enquiries</div>
-                </div>
-                <div className="bg-green-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-green-700">{stats.resolved}</div>
-                  <div className="text-sm text-green-600">Resolved</div>
-                </div>
-                <div className="bg-blue-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-blue-700">{stats.awaitingBusiness}</div>
-                  <div className="text-sm text-blue-600">Awaiting {businessName || 'Business'}</div>
-                </div>
-                <div className="bg-orange-50 rounded-lg p-4 text-center">
-                  <div className="text-2xl font-bold text-orange-700">{stats.awaitingTechezm}</div>
-                  <div className="text-sm text-orange-600">Awaiting Techezm</div>
-                </div>
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Awaiting Business */}
+                <Card 
+                  className={`border-l-4 border-l-blue-500 shadow-sm cursor-pointer transition-all hover:shadow-md ${statusFilter === 'awaiting_business' ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-50/50' : ''}`}
+                  onClick={() => setStatusFilter(prev => prev === 'awaiting_business' ? 'active' : 'awaiting_business')}
+                >
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">Awaiting {businessName || 'Business'}</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.awaitingBusiness}</h3>
+                    </div>
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${statusFilter === 'awaiting_business' ? 'bg-blue-100' : 'bg-blue-50'}`}>
+                      <Building2 className="h-5 w-5 text-blue-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Awaiting Techezm */}
+                <Card 
+                  className={`border-l-4 border-l-orange-500 shadow-sm cursor-pointer transition-all hover:shadow-md ${statusFilter === 'awaiting_techezm' ? 'ring-2 ring-orange-500 ring-offset-2 bg-orange-50/50' : ''}`}
+                  onClick={() => setStatusFilter(prev => prev === 'awaiting_techezm' ? 'active' : 'awaiting_techezm')}
+                >
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">Awaiting Techezm</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.awaitingTechezm}</h3>
+                    </div>
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${statusFilter === 'awaiting_techezm' ? 'bg-orange-100' : 'bg-orange-50'}`}>
+                      <User className="h-5 w-5 text-orange-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Amazon */}
+                <Card 
+                  className={`border-l-4 border-l-yellow-500 shadow-sm cursor-pointer transition-all hover:shadow-md ${platformFilter === 'amazon' ? 'ring-2 ring-yellow-500 ring-offset-2 bg-yellow-50/50' : ''}`}
+                  onClick={() => setPlatformFilter(prev => prev === 'amazon' ? 'all' : 'amazon')}
+                >
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">Amazon Active</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.amazon}</h3>
+                    </div>
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${platformFilter === 'amazon' ? 'bg-yellow-100' : 'bg-yellow-50'}`}>
+                      <ShoppingCart className="h-5 w-5 text-yellow-600" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Back Market */}
+                <Card 
+                  className={`border-l-4 border-l-purple-500 shadow-sm cursor-pointer transition-all hover:shadow-md ${platformFilter === 'backmarket' ? 'ring-2 ring-purple-500 ring-offset-2 bg-purple-50/50' : ''}`}
+                  onClick={() => setPlatformFilter(prev => prev === 'backmarket' ? 'all' : 'backmarket')}
+                >
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-500">Back Market Active</p>
+                      <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.backmarket}</h3>
+                    </div>
+                    <div className={`h-10 w-10 rounded-full flex items-center justify-center ${platformFilter === 'backmarket' ? 'bg-purple-100' : 'bg-purple-50'}`}>
+                      <Store className="h-5 w-5 text-purple-600" />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </CardHeader>
             <CardContent>
@@ -605,10 +681,11 @@ export default function EnquiriesPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
+                      <TableHead>Created By</TableHead>
                       <TableHead>Order Number</TableHead>
                       <TableHead>Platform</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Created By</TableHead>
+                      <TableHead>Last Update</TableHead>
                       <TableHead>Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -621,6 +698,7 @@ export default function EnquiriesPage() {
                             <span>{format(new Date(enquiry.enquiry_date), 'dd/MM/yyyy')}</span>
                           </div>
                         </TableCell>
+                        <TableCell>{enquiry.created_by_username || 'Unknown'}</TableCell>
                         <TableCell>
                           <div className="flex items-center space-x-2">
                             <Package className="h-4 w-4 text-slate-400" />
@@ -637,7 +715,17 @@ export default function EnquiriesPage() {
                             {getDisplayStatus(enquiry.status)}
                           </Badge>
                         </TableCell>
-                        <TableCell>{enquiry.created_by_username || 'Unknown'}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">
+                              {enquiry.last_update_at ? format(new Date(enquiry.last_update_at), 'dd-MM-yyyy HH:mm') : '-'}
+                            </span>
+                            <span className="text-xs text-slate-500">
+                              by {enquiry.last_update_by || 'Unknown'}
+                            </span>
+                          </div>
+                        </TableCell>
+                        
                         <TableCell>
                           <Button 
                             variant="outline" 
@@ -652,6 +740,59 @@ export default function EnquiriesPage() {
                     ))}
                   </TableBody>
                 </Table>
+              )}
+
+              {/* Pagination Controls */}
+              {totalItems > 0 && (
+                <div className="flex items-center justify-between mt-4 border-t pt-4">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-slate-500">Rows per page:</span>
+                    <Select 
+                      value={limit.toString()} 
+                      onValueChange={(val) => {
+                        setLimit(Number(val));
+                        setPage(1); // Reset to first page when limit changes
+                      }}
+                    >
+                      <SelectTrigger className="w-[70px]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="20">20</SelectItem>
+                        <SelectItem value="30">30</SelectItem>
+                        <SelectItem value="40">40</SelectItem>
+                        <SelectItem value="50">50</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-slate-500">
+                      Showing {(page - 1) * limit + 1} to {Math.min(page * limit, totalItems)} of {totalItems}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.max(1, p - 1))}
+                      disabled={page === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      Previous
+                    </Button>
+                    <span className="text-sm text-slate-500">
+                      Page {page} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                      disabled={page === totalPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

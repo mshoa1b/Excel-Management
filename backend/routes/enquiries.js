@@ -43,17 +43,34 @@ router.get("/", authenticateToken, async (req, res) => {
   try {
     const myRole = req.user?.role_id;
     const myBiz = req.user?.business_id;
-    const { order_number, date_from, date_to, platform, status_filter } = req.query;
+    const { order_number, date_from, date_to, platform, status_filter, page = 1, limit = 20 } = req.query;
 
-    let query = `
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+
+    let selectClause = `
       SELECT 
         e.id, e.status, e.enquiry_date, e.order_number, e.platform, 
         e.description, e.business_id, e.created_by, e.created_at, e.updated_at,
         b.name as business_name,
-        u.username as created_by_username
+        u.username as created_by_username,
+        COALESCE(lm.created_at, e.created_at) as last_update_at,
+        COALESCE(lm_u.username, u.username) as last_update_by
+    `;
+
+    let fromClause = `
       FROM enquiries e
       LEFT JOIN businesses b ON e.business_id = b.id
       LEFT JOIN users u ON e.created_by = u.id
+      LEFT JOIN LATERAL (
+        SELECT created_at, created_by
+        FROM enquiry_messages
+        WHERE enquiry_id = e.id
+        ORDER BY created_at DESC
+        LIMIT 1
+      ) lm ON true
+      LEFT JOIN users lm_u ON lm.created_by = lm_u.id
     `;
 
     let conditions = [];
@@ -95,35 +112,93 @@ router.get("/", authenticateToken, async (req, res) => {
     }
 
     // Status filter
+    let statusCondition = null;
     if (status_filter && status_filter !== 'all') {
       if (status_filter === 'active') {
-        // Default: non-resolved OR resolved within last 5 days
-        conditions.push(`(e.status != 'Resolved' OR (e.status = 'Resolved' AND e.updated_at >= NOW() - INTERVAL '5 days'))`);
+        // Default: Only Awaiting... (exclude Resolved)
+        statusCondition = `e.status != 'Resolved'`;
       } else if (status_filter === 'resolved') {
-        conditions.push(`e.status = 'Resolved'`);
+        statusCondition = `e.status = 'Resolved'`;
       } else if (status_filter === 'awaiting_business') {
-        conditions.push(`e.status = 'Awaiting Business'`);
+        statusCondition = `e.status = 'Awaiting Business'`;
       } else if (status_filter === 'awaiting_techezm') {
-        conditions.push(`e.status = 'Awaiting Techezm'`);
+        statusCondition = `e.status = 'Awaiting Techezm'`;
       }
     } else if (!status_filter || status_filter === 'active') {
-      // Default behavior: exclude old resolved enquiries
-      conditions.push(`(e.status != 'Resolved' OR (e.status = 'Resolved' AND e.updated_at >= NOW() - INTERVAL '5 days'))`);
+      // Default behavior: Only Awaiting... (exclude Resolved)
+      statusCondition = `e.status != 'Resolved'`;
     }
 
-    // Add WHERE clause if there are conditions
+    // Base WHERE clause (without status) for stats
+    let baseWhereClause = "";
     if (conditions.length > 0) {
-      query += ` WHERE ${conditions.join(' AND ')}`;
+      baseWhereClause = ` WHERE ${conditions.join(' AND ')}`;
     }
 
-    // Order by creation date (newest first)
-    query += " ORDER BY e.created_at DESC";
+    // Full WHERE clause (with status) for data
+    let fullWhereClause = baseWhereClause;
+    if (statusCondition) {
+      fullWhereClause += (baseWhereClause ? " AND " : " WHERE ") + statusCondition;
+    }
 
-    //console.log('Enquiries query:', query);
-    //console.log('Query params:', params);
+    // Stats query (counts by status, ignoring status filter but respecting others)
+    const statsQuery = `
+      SELECT 
+        COUNT(*) FILTER (WHERE status = 'Resolved') as resolved,
+        COUNT(*) FILTER (WHERE status = 'Awaiting Business') as awaiting_business,
+        COUNT(*) FILTER (WHERE status = 'Awaiting Techezm') as awaiting_techezm,
+        COUNT(*) FILTER (WHERE platform = 'amazon' AND status != 'Resolved') as amazon,
+        COUNT(*) FILTER (WHERE platform = 'backmarket' AND status != 'Resolved') as backmarket,
+        COUNT(*) as total
+      ${fromClause} ${baseWhereClause}
+    `;
+    
+    // We need to use a separate params array for stats because the main query adds limit/offset
+    const statsResult = await pool.query(statsQuery, params);
+    const stats = {
+      resolved: parseInt(statsResult.rows[0].resolved || 0),
+      awaitingBusiness: parseInt(statsResult.rows[0].awaiting_business || 0),
+      awaitingTechezm: parseInt(statsResult.rows[0].awaiting_techezm || 0),
+      amazon: parseInt(statsResult.rows[0].amazon || 0),
+      backmarket: parseInt(statsResult.rows[0].backmarket || 0),
+      total: parseInt(statsResult.rows[0].total || 0)
+    };
 
-    const { rows } = await pool.query(query, params);
-    res.json(rows);
+    // Count query for pagination (respects all filters including status)
+    const countQuery = `SELECT COUNT(*) ${fromClause} ${fullWhereClause}`;
+    const countResult = await pool.query(countQuery, params);
+    const totalFiltered = parseInt(countResult.rows[0].count);
+
+    // Determine sort order based on username
+    const username = req.user?.username || '';
+    let orderByClause = "";
+    
+    if (username.toLowerCase().startsWith('cs')) {
+      // CS users see 'Awaiting Techezm' first
+      orderByClause = "ORDER BY CASE WHEN e.status = 'Awaiting Techezm' THEN 0 ELSE 1 END, e.created_at DESC";
+    } else {
+      // Other users (Businesses) see 'Awaiting Business' first
+      orderByClause = "ORDER BY CASE WHEN e.status = 'Awaiting Business' THEN 0 ELSE 1 END, e.created_at DESC";
+    }
+
+    // Data query
+    let query = `${selectClause} ${fromClause} ${fullWhereClause} ${orderByClause} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    
+    // Add limit and offset to params
+    const queryParams = [...params, limitNum, offset];
+
+    const { rows } = await pool.query(query, queryParams);
+    
+    res.json({
+      data: rows,
+      stats,
+      pagination: {
+        total: totalFiltered,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(totalFiltered / limitNum)
+      }
+    });
   } catch (err) {
     console.error("GET /api/enquiries error:", err);
     res.status(500).json({ message: "Failed to fetch enquiries" });
