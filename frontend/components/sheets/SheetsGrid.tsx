@@ -448,13 +448,98 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     style.innerHTML = `
       .ag-theme-alpine .ag-row-hover {
         background-color: inherit !important;
-        color: inherit !important;
+        color: #ffffff !important;
         filter: none !important;
       }
+      
+      /* Force all text/icons in hovered row to be white */
+      .ag-theme-alpine .ag-row-hover .ag-cell,
+      .ag-theme-alpine .ag-row-hover .ag-cell * {
+        color: #ffffff !important;
+      }
+
       /* Also prevent cell hover overrides in some themes */
       .ag-theme-alpine .ag-cell:hover {
         background-color: transparent !important;
-        color: inherit !important;
+        color: #ffffff !important;
+      }
+      
+      /* Header Styling */
+      .ag-theme-alpine .ag-header {
+        background-color: #0f172a !important; /* slate-900 */
+        border-bottom: 1px solid #1e293b !important; /* slate-800 */
+      }
+      .ag-theme-alpine .ag-header-cell-text {
+        color: #94a3b8 !important; /* slate-400 */
+      }
+      .ag-theme-alpine .ag-header-icon {
+        color: #94a3b8 !important; /* slate-400 */
+      }
+
+      /* Grid Background & Borders */
+      .ag-theme-alpine {
+        background-color: #0f172a !important;
+      }
+      .ag-theme-alpine .ag-root-wrapper {
+        background-color: #0f172a !important;
+        border: 1px solid #1e293b !important;
+      }
+      .ag-theme-alpine .ag-body-viewport {
+        background-color: #0f172a !important;
+      }
+
+      /* Right Pinned: Force Dark (Actions Column) */
+      .ag-pinned-right-cols-container .ag-row {
+        background-color: #0f172a !important; /* slate-900 */
+        border-bottom-color: #1e293b !important; /* slate-800 */
+      }
+
+      /* Left Pinned: Handle Mixed Columns (Row Num vs Data) */
+      /* Remove row border to prevent color bleeding in gaps */
+      .ag-pinned-left-cols-container .ag-row {
+        border-bottom: none !important;
+      }
+      /* Restore border on cells */
+      .ag-pinned-left-cols-container .ag-cell {
+        border-bottom: 1px solid rgba(0,0,0,0.05);
+      }
+      /* Fix First Column (Row Num) Borders */
+      .ag-pinned-left-cols-container .ag-cell[col-id="rowNum"] {
+        border-bottom: 1px solid #1e293b !important;
+      }
+      
+      /* Pagination/Footer Styling */
+      .ag-theme-alpine .ag-paging-panel {
+        background-color: #0f172a !important; /* slate-900 */
+        color: #94a3b8 !important; /* slate-400 */
+        border-top: 1px solid #1e293b !important; /* slate-800 */
+      }
+      .ag-theme-alpine .ag-paging-button {
+        color: #94a3b8 !important;
+      }
+      .ag-theme-alpine .ag-paging-button:hover {
+        color: #f8fafc !important; /* slate-50 */
+      }
+      .ag-theme-alpine .ag-paging-button.ag-disabled {
+        color: #334155 !important; /* slate-700 */
+      }
+
+      /* Scrollbar Styling */
+      .ag-theme-alpine ::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+        background-color: #0f172a;
+      }
+      .ag-theme-alpine ::-webkit-scrollbar-thumb {
+        background-color: #475569; /* slate-600 (Lighter) */
+        border-radius: 6px;
+        border: 3px solid #0f172a;
+      }
+      .ag-theme-alpine ::-webkit-scrollbar-track {
+        background-color: #0f172a;
+      }
+      .ag-theme-alpine ::-webkit-scrollbar-corner {
+        background-color: #0f172a;
       }
     `;
     document.head.appendChild(style);
@@ -792,7 +877,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         suppressMenu: true,
         filter: false,
         resizable: true,
-        suppressSizeToFit: true
+        suppressSizeToFit: true,
+        cellClass: '!bg-slate-900 text-slate-400 border-r border-slate-800 flex items-center',
       },
       { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, hide: true },
       {
@@ -1384,7 +1470,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             wrapText: true,
             autoHeight: true,
             cellClass: 'px-2 py-1 border-r border-slate-100 flex items-center justify-center text-center break-words leading-tight text-xs',
-            headerClass: 'bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider',
+            headerClass: 'bg-slate-900 text-slate-400 font-semibold text-xs uppercase tracking-wider',
           }}
           getRowId={p => String(p.data?.id ?? Math.random())}
           getRowClass={() => 'group hover:bg-slate-50/50 transition-colors'}

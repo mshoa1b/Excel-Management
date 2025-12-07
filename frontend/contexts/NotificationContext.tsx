@@ -59,9 +59,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
         // Update browser tab title with notification count
         if (unread > 0) {
-            document.title = `(${unread}) Excel Management`;
+            document.title = `(${unread}) Techezm RMA`;
         } else {
-            document.title = 'Excel Management';
+            document.title = 'Techezm RMA';
         }
     }, [notifications]);
 
