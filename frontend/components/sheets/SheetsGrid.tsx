@@ -754,7 +754,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   // Columns
   const colDefs: ColDef<SheetRecord>[] = useMemo(
     () => [
-
+      
       {
         colId: 'rowNum',
         headerName: '#',
@@ -770,58 +770,39 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         resizable: true,
         suppressSizeToFit: true
       },
+      { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, hide: true },
       { headerName: 'Order Number', field: 'order_no', editable: false, pinned: 'left', minWidth: 150 },
       { headerName: 'Blocked By', field: 'blocked_by', editable: false, pinned: 'left' },
+      
+      { headerName: 'Date Received', field: 'date_received', editable: false, valueFormatter: dateFormatter, },
+      { headerName: 'Order Date', field: 'order_date', editable: false, valueFormatter: dateFormatter, },
       { headerName: 'Customer Name', field: 'customer_name', editable: false },
       { headerName: 'IMEI', field: 'imei', editable: false, minWidth: 150 },
       { headerName: 'SKU', field: 'sku', editable: false },
-      { headerName: 'Return ID', valueGetter: p => buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0), editable: false, hide: true },
-
-      {
-        headerName: 'Date Received', field: 'date_received', editable: false,
-        valueFormatter: dateFormatter,
-      },
-      {
-        headerName: 'Order Date', field: 'order_date', editable: false,
-        valueFormatter: dateFormatter,
-      },
-
-      { headerName: 'Return Type', field: 'return_type', editable: false },
-      { headerName: 'Locked', field: 'locked', editable: false },
-      { headerName: 'OOW Case', field: 'oow_case', editable: false },
-
-      { headerName: 'Replacement Available', field: 'replacement_available', editable: false },
-      { headerName: 'Done By', field: 'done_by', editable: false },
-
-      { headerName: 'Resolution', field: 'resolution', editable: false },
-
-      { headerName: 'Refund Amount', field: 'refund_amount', editable: false, valueFormatter: (p) => typeof p.value === 'number' ? formatCurrency(p.value) : formatCurrency(0) },
-
-      {
-        headerName: 'Refund Date', field: 'refund_date', editable: false,
-        valueFormatter: dateFormatter,
-      },
-
-      { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: false },
-      { headerName: 'Platform', field: 'platform', editable: false, valueGetter: p => computePlatform(p.data?.order_no ?? '') },
-      { headerName: 'Return within 30 days', field: 'return_within_30_days', editable: false, valueGetter: p => computeWithin30(p.data?.date_received ?? '', p.data?.order_date ?? '') },
-
-      {
-        headerName: 'Issue', field: 'issue', editable: false,
-      },
-
-      { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: false },
-
-      // Multiline, fixed width
-      { headerName: 'Additional Notes', field: 'additional_notes', editable: false, wrapText: true, autoHeight: true, width: 260 },
-
-      { headerName: 'Status', field: 'status', editable: false },
       { headerName: 'Customer Comment', field: 'customer_comment', editable: false, wrapText: true, autoHeight: true, width: 260 },
       { headerName: 'Multiple Return', field: 'multiple_return', editable: false },
+      { headerName: 'Return Type', field: 'return_type', editable: false },
+      
+      { headerName: 'Locked', field: 'locked', editable: false },
+      { headerName: 'OOW Case', field: 'oow_case', editable: false },
+      { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: false },
+      { headerName: 'Replacement Available', field: 'replacement_available', editable: false },
+      { headerName: 'Resolution', field: 'resolution', editable: false },
+      
+      { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: false }, 
+      { headerName: 'Refund Amount', field: 'refund_amount', editable: false, valueFormatter: (p) => typeof p.value === 'number' ? formatCurrency(p.value) : formatCurrency(0) },
+      { headerName: 'Refund Date', field: 'refund_date', editable: false, valueFormatter: dateFormatter, },
+
+      { headerName: 'CS Comments', field: 'cs_comment', editable: false, wrapText: true, autoHeight: true, width: 260 },
+      { headerName: 'Additional Notes', field: 'additional_notes', editable: false, wrapText: true, autoHeight: true, width: 260 },
       { headerName: 'Manager Notes', field: 'manager_notes', editable: false, wrapText: true, autoHeight: true, width: 260 },
-
+            
+      { headerName: 'Return within 30 days', field: 'return_within_30_days', editable: false, valueGetter: p => computeWithin30(p.data?.date_received ?? '', p.data?.order_date ?? '') },
+      { headerName: 'Platform', field: 'platform', editable: false, valueGetter: p => computePlatform(p.data?.order_no ?? '') },
+      { headerName: 'Issue', field: 'issue', editable: false },   
+      { headerName: 'Done By', field: 'done_by', editable: false },
+      { headerName: 'Status', field: 'status', editable: false },
       { headerName: 'Last Updated', field: 'updated_at', editable: false, valueFormatter: (p) => p.value ? format(new Date(p.value), 'dd-MM-yyyy HH:mm') : '' },
-
       {
         headerName: 'Actions',
         pinned: 'right',

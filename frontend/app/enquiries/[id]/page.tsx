@@ -261,9 +261,9 @@ export default function EnquiryDetailPage() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'Awaiting Business':
-        return 'bg-orange-100 text-orange-800';
-      case 'Awaiting Techezm':
         return 'bg-blue-100 text-blue-800';
+      case 'Awaiting Techezm':
+        return 'bg-orange-100 text-orange-800';
       case 'Resolved':
         return 'bg-green-100 text-green-800';
       default:
