@@ -6,9 +6,10 @@ import { useNavigation } from '@/contexts/NavigationContext';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
+  fullWidth?: boolean;
 }
 
-export default function DashboardLayout({ children }: DashboardLayoutProps) {
+export default function DashboardLayout({ children, fullWidth = false }: DashboardLayoutProps) {
   const { isNavCollapsed } = useNavigation();
   const [isDesktop, setIsDesktop] = useState(false);
 
@@ -34,7 +35,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         className="transition-all duration-300"
         style={{ paddingLeft: getLeftPadding() }}
       >
-        <main className="py-6 px-4 lg:px-8">
+        <main className={`py-6 ${fullWidth ? 'px-0' : 'px-4 lg:px-8'}`}>
           {children}
         </main>
       </div>

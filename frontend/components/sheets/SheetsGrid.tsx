@@ -374,6 +374,14 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               return !isBlocked && status !== 'resolved';
             case 'Resolved':
               return status === 'resolved';
+            case 'Overdue': {
+              if (!row.date_received || status === 'resolved') return false;
+              const received = new Date(row.date_received);
+              const now = new Date();
+              const diffTime = now.getTime() - received.getTime();
+              const diffDays = diffTime / (1000 * 3600 * 24);
+              return diffDays > 14;
+            }
 
             // Legend Filters
             case 'Legend_Resolved':
@@ -816,22 +824,38 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       {
         headerName: 'Actions',
         pinned: 'right',
-        width: 158,
-        minWidth: 140,
-        maxWidth: 180,
+        width: 200,
+        minWidth: 200,
+        maxWidth: 240,
         filter: false,
         resizable: true,
         suppressSizeToFit: true,
+        cellClass: 'p-0 flex items-center justify-center',
         cellRenderer: (p: any) => {
           const orderNumber = p.data?.order_no;
           const platform = computePlatform(p.data);
           const hasEnquiry = enquiryCounts[orderNumber] > 0;
 
           const btnClass = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white group-hover:text-slate-800 hover:bg-white/20 group-hover:hover:bg-slate-200 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2";
-          const activeBtnClass = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white bg-blue-600 hover:bg-blue-700 transition-all";
+          const activeBtnClass = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white bg-blue-600 hover:bg-blue-900 transition-all";
 
           return (
-            <div className="flex items-center justify-end gap-1 h-full w-full pr-2">
+            <div className="flex items-center justify-end gap-[1px] h-full w-full">
+              
+
+              <button
+                className={btnClass}
+                onClick={() => {
+                  if (p.data) {
+                    setEditingRow(p.data);
+                    setFormOpen(true);
+                  }
+                }}
+                title="Edit Row"
+              >
+                <Pencil className="h-4 w-4" />
+              </button>
+
               <div className="flex-shrink-0">
                 <AttachmentManager
                   sheetId={p.data?.id}
@@ -851,19 +875,6 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               </div>
 
               <button
-                className={btnClass}
-                onClick={() => {
-                  if (p.data) {
-                    setEditingRow(p.data);
-                    setFormOpen(true);
-                  }
-                }}
-                title="Edit Row"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
-
-              <button
                 className={hasEnquiry ? activeBtnClass : btnClass}
                 onClick={() => orderNumber && handleEnquiryAction(orderNumber, platform)}
                 title={hasEnquiry ? 'View existing enquiry' : 'Create new enquiry'}
@@ -873,19 +884,19 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               </button>
 
               <button
-                className={`${btnClass} hover:text-red-600 hover:bg-red-50`}
-                onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
-                title="Delete row"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-
-              <button
                 className={btnClass}
                 onClick={() => p.data && handleViewHistory(p.data)}
                 title="View History"
               >
                 <History className="h-4 w-4" />
+              </button>
+
+              <button
+                className={`${btnClass} hover:text-red-600 hover:bg-red-50`}
+                onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
+                title="Delete row"
+              >
+                <Trash2 className="h-4 w-4" />
               </button>
             </div >
           );
@@ -932,10 +943,19 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       row.status && row.status.toLowerCase() === 'resolved'
     ).length;
 
+    const overdue = filteredData.filter(row => {
+      if (!row.date_received || (row.status && row.status.toLowerCase() === 'resolved')) return false;
+      const received = new Date(row.date_received);
+      const now = new Date();
+      const diffTime = now.getTime() - received.getTime();
+      const diffDays = diffTime / (1000 * 3600 * 24);
+      return diffDays > 14;
+    }).length;
+
     const total = filteredData.length;
     const actionable = unresolved; // Cases that can be worked on (not blocked, not resolved)
 
-    return { blocked, unresolved, resolved, total, actionable };
+    return { blocked, unresolved, resolved, total, actionable, overdue };
   }, [filteredData]);
 
 
@@ -1008,6 +1028,12 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           <h3 className="text-sm font-semibold text-gray-700">Status Overview</h3>
           <span className="text-xs text-gray-500">Click tiles to filter</span>
         </div>
+        {statusStats.overdue > 0 && (
+          <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-md text-red-700 text-sm font-medium flex items-center gap-2">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            There are {statusStats.overdue} returns received more than 14 days ago. Please review them urgently.
+          </div>
+        )}
         <div className="flex flex-wrap gap-3">
           <div
             onClick={() => toggleFilter('Blocked')}
@@ -1017,6 +1043,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             <div className="w-3 h-3 bg-red-500 rounded-full"></div>
             <span className="text-red-700 font-medium text-sm">Blocked:</span>
             <span className="text-lg font-bold text-red-800">{statusStats.blocked}</span>
+
           </div>
           <div
             onClick={() => toggleFilter('Actionable')}
@@ -1036,6 +1063,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             <span className="text-green-700 font-medium text-sm">Resolved:</span>
             <span className="text-lg font-bold text-green-800">{statusStats.resolved}</span>
           </div>
+          
           <div className="flex items-center gap-2 bg-blue-50 px-3 py-2 rounded-md shadow-sm border border-blue-100">
             <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
             <span className="text-blue-700 font-medium text-sm">Total:</span>
@@ -1050,6 +1078,15 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               </span>
             </div>
           )}
+          <div
+            onClick={() => toggleFilter('Overdue')}
+            className={`ml-auto flex items-center gap-2 px-3 py-2 rounded-md shadow-sm border cursor-pointer transition-all ${activeFilter === 'Overdue' ? 'ring-2 ring-red-500 ring-offset-1 bg-red-700 text-white' : 'bg-red-600 border-red-600 text-white hover:bg-red-700'
+              }`}
+          >
+            <div className="w-3 h-3 bg-white rounded-full"></div>
+            <span className="font-medium text-sm text-white">Received 14+ Days:</span>
+            <span className="text-lg font-bold text-white">{statusStats.overdue}</span>
+          </div>
         </div>
       </div>
 
@@ -1108,6 +1145,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           ['#DC2626', 'Locked', 'Legend_Locked'],
           ['#B45309', 'OOW', 'Legend_OOW'],
           ['#22C55E', 'Unresolved', 'Legend_Unresolved'],
+
         ].map(([hex, label, filterKey]) => (
           <div
             key={hex}
@@ -1137,14 +1175,14 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           onGridSizeChanged={onGridSizeChanged}
           onColumnResized={onColumnResized}
           pagination={true}
-          paginationPageSize={50}
-          paginationPageSizeSelector={[20, 50, 100]}
+          paginationPageSize={30}
+          paginationPageSizeSelector={[20, 30, 40, 50, 100, 200]}
           defaultColDef={{
             sortable: true,
             resizable: true,
             filter: true,
             minWidth: 40,
-            cellClass: 'px-2 py-1 border border-gray-200',
+            cellClass: 'px-2 py-1 border border-gray-200 flex items-center justify-center text-center',
           }}
           getRowId={p => String(p.data?.id ?? Math.random())}
           getRowClass={() => 'group'}
@@ -1200,6 +1238,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         onSave={handleSaveSheet}
         businessId={businessId}
         staffOptions={staffOptions}
+        onChat={handleEnquiryAction}
+        onHistory={handleViewHistory}
       />
 
       <SheetHistoryModal
