@@ -1423,9 +1423,6 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               ['#F97316', 'Awaiting Techezm', 'Legend_Awaiting Techezm'],
               ['#DB2777', 'Awaiting Replacement', 'Legend_Awaiting Replacement'],
               ['#6B7280', 'Blocked', 'Legend_Blocked'],
-              ['#DC2626', 'Locked', 'Legend_Locked'],
-              ['#B45309', 'OOW', 'Legend_OOW'],
-              ['#22C55E', 'Unresolved', 'Legend_Unresolved'],
 
             ].map(([hex, label, filterKey]) => (
               <div
