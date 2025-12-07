@@ -93,6 +93,49 @@ export function SheetFormModal({
         }
     }, [open, initialData]);
 
+    const isTechezm = user?.username?.toLowerCase().startsWith('cs');
+    const isEdit = !!initialData?.id;
+
+    const isFieldDisabled = (field: string) => {
+        // System fields (always disabled)
+        // Note: out_of_warranty changed to oow_case to match SheetRecord/backend
+        if (['platform', 'locked', 'oow_case', 'return_within_30_days', 'updated_at'].includes(field))
+            return true;
+
+        switch (field) {
+            // Techezm Only (Client cannot edit or add)
+            case 'order_date':
+            case 'sku':
+            case 'customer_comment':
+            case 'blocked_by':
+            case 'done_by':
+            case 'resolution': // Techezm-only as requested
+                return !isTechezm;
+
+            // Techezm Edit-Only fields
+            case 'refund_amount':
+            case 'refund_date':
+            case 'cs_comment':
+            case 'manager_notes':
+                if (!isTechezm) return true;
+                if (!isEdit) return true;
+                return false;
+
+            // Tracking No: Techezm cannot ADD, but can edit
+            case 'return_tracking_no':
+                if (isTechezm && !isEdit) return true;
+                return false;
+
+            // Replacement Available: Clients always allowed, Techezm only allowed when editing
+            case 'replacement_available':
+                if (isTechezm && !isEdit) return true;
+                return false;
+
+            default:
+                return false; // open to all by default
+        }
+    };
+
     const handleChange = (field: keyof SheetRecord, value: any) => {
         setFormData(prev => {
             const next = { ...prev, [field]: value };
@@ -171,7 +214,7 @@ export function SheetFormModal({
                     {initialData?.id && (
                         <div className="flex items-center gap-2 mb-4 p-2 bg-slate-50 rounded-md border">
                             <span className="text-sm font-medium text-slate-600 mr-2">Quick Actions:</span>
-                            
+
                             <div className="flex-shrink-0">
                                 <div className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 gap-2">
                                     <AttachmentManager
@@ -225,6 +268,7 @@ export function SheetFormModal({
                                 <Input
                                     value={formData.order_no}
                                     onChange={e => handleChange('order_no', e.target.value)}
+                                    disabled={isFieldDisabled('order_no')}
                                     placeholder="Order No"
                                 />
                             </div>
@@ -234,6 +278,7 @@ export function SheetFormModal({
                                     type="date"
                                     value={formData.date_received}
                                     onChange={e => handleChange('date_received', e.target.value)}
+                                    disabled={isFieldDisabled('date_received')}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -242,17 +287,19 @@ export function SheetFormModal({
                                     type="date"
                                     value={formData.order_date}
                                     onChange={e => handleChange('order_date', e.target.value)}
+                                    disabled={isFieldDisabled('order_date')}
                                 />
                             </div>
                             <div className="space-y-2">
                                 <Label>Platform</Label>
-                                <Input value={formData.platform} readOnly className="bg-slate-100" />
+                                <Input value={formData.platform} readOnly disabled={isFieldDisabled('platform')} className="bg-slate-100" />
                             </div>
                             <div className="space-y-2">
                                 <Label>Return Tracking No</Label>
                                 <Input
                                     value={formData.return_tracking_no}
                                     onChange={e => handleChange('return_tracking_no', e.target.value)}
+                                    disabled={isFieldDisabled('return_tracking_no')}
                                 />
                             </div>
                         </div>
@@ -267,6 +314,7 @@ export function SheetFormModal({
                                 <Input
                                     value={formData.customer_name}
                                     onChange={e => handleChange('customer_name', e.target.value)}
+                                    disabled={isFieldDisabled('customer_name')}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -274,6 +322,7 @@ export function SheetFormModal({
                                 <Input
                                     value={formData.imei}
                                     onChange={e => handleChange('imei', e.target.value)}
+                                    disabled={isFieldDisabled('imei')}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -281,6 +330,7 @@ export function SheetFormModal({
                                 <Input
                                     value={formData.sku}
                                     onChange={e => handleChange('sku', e.target.value)}
+                                    disabled={isFieldDisabled('sku')}
                                 />
                             </div>
                             <div className="col-span-3 space-y-2">
@@ -288,6 +338,7 @@ export function SheetFormModal({
                                 <Textarea
                                     value={formData.customer_comment}
                                     onChange={e => handleChange('customer_comment', e.target.value)}
+                                    disabled={isFieldDisabled('customer_comment')}
                                 />
                             </div>
                         </div>
@@ -299,7 +350,7 @@ export function SheetFormModal({
                         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                             <div className="space-y-2">
                                 <Label>Status</Label>
-                                <Select value={formData.status} onValueChange={v => handleChange('status', v)}>
+                                <Select value={formData.status} onValueChange={v => handleChange('status', v)} disabled={isFieldDisabled('status')}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="Pending">Pending</SelectItem>
@@ -311,7 +362,7 @@ export function SheetFormModal({
                             </div>
                             <div className="space-y-2">
                                 <Label>Blocked By</Label>
-                                <Select value={formData.blocked_by || 'Choose'} onValueChange={v => handleChange('blocked_by', v === 'Choose' ? '' : v)}>
+                                <Select value={formData.blocked_by || 'Choose'} onValueChange={v => handleChange('blocked_by', v === 'Choose' ? '' : v)} disabled={isFieldDisabled('blocked_by')}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {blockedByOptions.map(opt => (
@@ -322,7 +373,7 @@ export function SheetFormModal({
                             </div>
                             <div className="space-y-2">
                                 <Label>Locked?</Label>
-                                <Select value={formData.locked || 'Choose'} onValueChange={v => handleChange('locked', v)}>
+                                <Select value={formData.locked || 'Choose'} onValueChange={v => handleChange('locked', v)} disabled={isFieldDisabled('locked')}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {lockedOptions.map(opt => (
@@ -333,7 +384,7 @@ export function SheetFormModal({
                             </div>
                             <div className="space-y-2">
                                 <Label>Out of Warranty?</Label>
-                                <Select value={formData.oow_case || 'Choose'} onValueChange={v => handleChange('oow_case', v)}>
+                                <Select value={formData.oow_case || 'Choose'} onValueChange={v => handleChange('oow_case', v)} disabled={isFieldDisabled('oow_case')}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {oowOptions.map(opt => (
@@ -351,7 +402,7 @@ export function SheetFormModal({
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <div className="space-y-2">
                                 <Label>Done By</Label>
-                                <Select value={formData.done_by || 'Choose'} onValueChange={v => handleChange('done_by', v)}>
+                                <Select value={formData.done_by || 'Choose'} onValueChange={v => handleChange('done_by', v)} disabled={isFieldDisabled('done_by')}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {staffOptions.map(opt => (
@@ -362,7 +413,7 @@ export function SheetFormModal({
                             </div>
                             <div className="space-y-2">
                                 <Label>Return Type</Label>
-                                <Select value={formData.return_type || 'Choose'} onValueChange={v => handleChange('return_type', v)}>
+                                <Select value={formData.return_type || 'Choose'} onValueChange={v => handleChange('return_type', v)} disabled={isFieldDisabled('return_type')}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {returnTypeOptions.map(opt => (
@@ -373,7 +424,7 @@ export function SheetFormModal({
                             </div>
                             <div className="space-y-2">
                                 <Label>Replacement Available</Label>
-                                <Select value={formData.replacement_available || 'Choose'} onValueChange={v => handleChange('replacement_available', v)}>
+                                <Select value={formData.replacement_available || 'Choose'} onValueChange={v => handleChange('replacement_available', v)} disabled={isFieldDisabled('replacement_available')}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                         {yesNoOptions.map(opt => (
@@ -388,6 +439,7 @@ export function SheetFormModal({
                                     type="number"
                                     value={formData.refund_amount}
                                     onChange={e => handleChange('refund_amount', parseFloat(e.target.value))}
+                                    disabled={isFieldDisabled('refund_amount')}
                                 />
                             </div>
                             <div className="space-y-2">
@@ -396,7 +448,21 @@ export function SheetFormModal({
                                     type="date"
                                     value={formData.refund_date}
                                     onChange={e => handleChange('refund_date', e.target.value)}
+                                    disabled={isFieldDisabled('refund_date')}
                                 />
+                            </div>
+                            <div className="space-y-2 col-span-2">
+                                <Label>Resolution</Label>
+                                <Select value={formData.resolution || 'Choose'} onValueChange={v => handleChange('resolution', v)} disabled={isFieldDisabled('resolution')}>
+                                    <SelectTrigger><SelectValue placeholder="Choose" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Choose">Choose</SelectItem>
+                                        <SelectItem value="Refunded">Refunded</SelectItem>
+                                        <SelectItem value="Replaced">Replaced</SelectItem>
+                                        <SelectItem value="Denied">Denied</SelectItem>
+                                        <SelectItem value="Pending">Pending</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                         <div className="space-y-2">
@@ -404,6 +470,7 @@ export function SheetFormModal({
                             <Textarea
                                 value={formData.cs_comment}
                                 onChange={e => handleChange('cs_comment', e.target.value)}
+                                disabled={isFieldDisabled('cs_comment')}
                             />
                         </div>
                         <div className="space-y-2">
@@ -411,6 +478,7 @@ export function SheetFormModal({
                             <Textarea
                                 value={formData.manager_notes}
                                 onChange={e => handleChange('manager_notes', e.target.value)}
+                                disabled={isFieldDisabled('manager_notes')}
                             />
                         </div>
                         <div className="space-y-2">
@@ -418,6 +486,7 @@ export function SheetFormModal({
                             <Textarea
                                 value={formData.additional_notes}
                                 onChange={e => handleChange('additional_notes', e.target.value)}
+                                disabled={isFieldDisabled('additional_notes')}
                             />
                         </div>
                     </div>
