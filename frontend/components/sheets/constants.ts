@@ -1,7 +1,8 @@
 
 export const blockedByOptions = [
-    'Choose', '', 'PIN Required', 'Code Required', 'Apple ID Required', 'Google ID Required',
-    'Awaiting Part', 'Awaiting Replacement', 'Awaiting Customer', 'Awaiting BM', 'Awaiting G&I', 'Awaiting Techezm'
+    'Choose', 'PIN Required', 'Code Required', 'Apple ID Required', 'Google ID Required',
+    'Awaiting Part', 'Awaiting Replacement', 'Awaiting Customer', 'Awaiting BM', 'Awaiting G&I', 'Awaiting Techezm',
+    'OOW', 'Locked'
 ];
 
 export const lockedOptions = ['Choose', 'No', 'Google ID', 'Apple ID', 'PIN'];
