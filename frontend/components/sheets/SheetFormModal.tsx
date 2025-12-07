@@ -12,7 +12,9 @@ import { blockedByOptions, lockedOptions, oowOptions, yesNoOptions, returnTypeOp
 import { fetchBMOrder } from './api';
 import { computePlatform, buildReturnId } from '@/lib/sheetFormulas';
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageSquare, History } from 'lucide-react';
+import { AttachmentManager } from './AttachmentManager';
+import { apiClient } from '@/lib/api';
 
 interface SheetFormModalProps {
     open: boolean;
@@ -21,6 +23,8 @@ interface SheetFormModalProps {
     onSave: (data: Partial<SheetRecord>) => Promise<void>;
     businessId: string;
     staffOptions: string[];
+    onChat?: (orderNumber: string, platform: string) => void;
+    onHistory?: (row: SheetRecord) => void;
 }
 
 export function SheetFormModal({
@@ -29,11 +33,24 @@ export function SheetFormModal({
     initialData,
     onSave,
     businessId,
-    staffOptions
+    staffOptions,
+    onChat,
+    onHistory,
 }: SheetFormModalProps) {
     const [formData, setFormData] = useState<Partial<SheetRecord>>({});
     const [loading, setLoading] = useState(false);
     const [fetchingBM, setFetchingBM] = useState(false);
+    const [attachmentCount, setAttachmentCount] = useState(0);
+
+    useEffect(() => {
+        if (initialData?.id && open) {
+            apiClient.getAttachments(initialData.id).then(attachments => {
+                setAttachmentCount(attachments.length);
+            }).catch(() => setAttachmentCount(0));
+        } else {
+            setAttachmentCount(0);
+        }
+    }, [initialData?.id, open]);
 
     useEffect(() => {
         if (open) {
@@ -144,7 +161,58 @@ export function SheetFormModal({
                     <DialogTitle>{initialData ? 'Edit Sheet Record' : 'New Sheet Record'}</DialogTitle>
                 </DialogHeader>
 
+
+
                 <form onSubmit={handleSubmit} className="space-y-6 py-4">
+
+                    {/* Actions Row */}
+                    {initialData?.id && (
+                        <div className="flex items-center gap-2 mb-4 p-2 bg-slate-50 rounded-md border">
+                            <span className="text-sm font-medium text-slate-600 mr-2">Quick Actions:</span>
+                            
+                            <div className="flex-shrink-0">
+                                <div className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-3 gap-2">
+                                    <AttachmentManager
+                                        sheetId={initialData.id}
+                                        attachmentCount={attachmentCount}
+                                        returnId={buildReturnId(initialData.date_received, 0)}
+                                        variant="form"
+                                        onAttachmentChange={() => {
+                                            if (initialData.id) {
+                                                apiClient.getAttachments(initialData.id).then(attachments => {
+                                                    setAttachmentCount(attachments.length);
+                                                }).catch(() => { });
+                                            }
+                                        }}
+                                    />
+                                    <span className="text-sm">Attachments</span>
+                                </div>
+                            </div>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 h-8"
+                                onClick={() => onChat && formData.order_no && onChat(formData.order_no, formData.platform || '')}
+                                disabled={!formData.order_no}
+                            >
+                                <MessageSquare className="h-4 w-4" />
+                                Chat
+                            </Button>
+
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 h-8"
+                                onClick={() => onHistory && onHistory(initialData as SheetRecord)}
+                            >
+                                <History className="h-4 w-4" />
+                                History
+                            </Button>
+                        </div>
+                    )}
 
                     {/* Section 1: Order Info */}
                     <div className="space-y-4">

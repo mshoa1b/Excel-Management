@@ -15,7 +15,7 @@ export default function ClientSheetsPage() {
 
   return (
     <ProtectedRoute businessId={businessId}>
-      <DashboardLayout>
+      <DashboardLayout fullWidth={true}>
         <div className="space-y-4">
           <SheetsGrid businessId={businessId} />
         </div>

@@ -21,6 +21,7 @@ interface AttachmentManagerProps {
   onAttachmentChange?: () => void;
   attachmentCount?: number;
   returnId?: string;
+  variant?: 'grid' | 'form';
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -35,7 +36,7 @@ const isImageFile = (mimeType: string): boolean => {
   return mimeType.startsWith('image/');
 };
 
-export function AttachmentManager({ sheetId, onAttachmentChange, attachmentCount, returnId }: AttachmentManagerProps) {
+export function AttachmentManager({ sheetId, onAttachmentChange, attachmentCount, returnId, variant = 'grid' }: AttachmentManagerProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -152,7 +153,10 @@ export function AttachmentManager({ sheetId, onAttachmentChange, attachmentCount
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
           <button
-            className="rounded-md px-2 py-1 text-white group-hover:text-black hover:bg-gray-100 flex items-center gap-1"
+            className={`rounded-md px-2 py-1 flex items-center gap-1 ${variant === 'form'
+                ? 'text-gray-600 hover:text-black hover:bg-gray-100'
+                : 'text-white group-hover:text-black hover:bg-gray-100'
+              }`}
             title="Manage attachments"
           >
             <Paperclip className="h-4 w-4" />
