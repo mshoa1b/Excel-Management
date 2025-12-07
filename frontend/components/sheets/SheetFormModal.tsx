@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { Loader2, MessageSquare, History } from 'lucide-react';
 import { AttachmentManager } from './AttachmentManager';
 import { apiClient } from '@/lib/api';
+import { useAuth } from '@/hooks/useAuth';
 
 interface SheetFormModalProps {
     open: boolean;
@@ -37,6 +38,7 @@ export function SheetFormModal({
     onChat,
     onHistory,
 }: SheetFormModalProps) {
+    const { user } = useAuth();
     const [formData, setFormData] = useState<Partial<SheetRecord>>({});
     const [loading, setLoading] = useState(false);
     const [fetchingBM, setFetchingBM] = useState(false);
@@ -74,7 +76,7 @@ export function SheetFormModal({
                     locked: 'Choose',
                     oow_case: 'Choose',
                     replacement_available: 'Choose',
-                    done_by: 'Choose',
+                    done_by: user?.username || 'Choose',
                     cs_comment: '',
                     resolution: 'Choose',
                     refund_amount: 0,
