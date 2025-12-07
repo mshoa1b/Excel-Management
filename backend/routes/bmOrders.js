@@ -127,7 +127,12 @@ router.get("/:orderNumber", authenticateToken, async (req, res) => {
       out_of_warranty: "Choose",
       additional_notes: "",
       status: "Pending",
-      manager_notes: ""
+      manager_notes: "",
+      
+      // Extra fields for ShipStation Label Generation
+      shipping_address: orderData?.shipping_address,
+      customer_email: orderData?.customer?.email,
+      product_title: firstLine?.product || ""
     };
 
     res.json(sheetData);

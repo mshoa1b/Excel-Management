@@ -22,11 +22,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History, Pencil } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History, Pencil, Truck } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AttachmentManager } from './AttachmentManager';
 import { SheetHistoryModal } from './SheetHistoryModal';
 import { SheetFormModal } from './SheetFormModal';
+import { CreateLabelModal } from './CreateLabelModal';
 import { blockedByOptions, MULTILINE_COLS } from './constants';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
@@ -225,6 +226,10 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   const [historyRow, setHistoryRow] = useState<SheetRecord | null>(null);
   const [historyModalOpen, setHistoryModalOpen] = useState<boolean>(false);
   const [historySheetId, setHistorySheetId] = useState<number | null>(null);
+
+  // Label Modal State
+  const [labelModalOpen, setLabelModalOpen] = useState(false);
+  const [selectedSheetForLabel, setSelectedSheetForLabel] = useState<SheetRecord | null>(null);
 
 
   // Modal Edit State
@@ -857,6 +862,19 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                 <Pencil className="h-4 w-4" />
               </button>
 
+              <button
+                className={btnClass}
+                onClick={() => {
+                  if (p.data) {
+                    setSelectedSheetForLabel(p.data);
+                    setLabelModalOpen(true);
+                  }
+                }}
+                title="Create Label"
+              >
+                <Truck className="h-4 w-4" />
+              </button>
+
               <div className="flex-shrink-0">
                 <AttachmentManager
                   sheetId={p.data?.id}
@@ -1244,6 +1262,15 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         onChat={handleEnquiryAction}
         onHistory={handleViewHistory}
       />
+
+      {selectedSheetForLabel && (
+        <CreateLabelModal
+          open={labelModalOpen}
+          onOpenChange={setLabelModalOpen}
+          sheet={selectedSheetForLabel}
+          businessId={Number(businessId)}
+        />
+      )}
 
       <SheetHistoryModal
         businessId={Number(businessId)}

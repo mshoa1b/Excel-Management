@@ -16,6 +16,7 @@ const bmOrdersRoutes = require("./routes/bmOrders");
 const backmarketCredsRoutes = require("./routes/backmarket");
 const attachmentRoutes = require("./routes/attachments");
 const enquiriesRoutes = require("./routes/enquiries"); 
+const shipstationRoutes = require("./routes/shipstation");
 
 const app = express();
 
@@ -112,6 +113,7 @@ app.use("/api/stats", statsRoutes);
 app.use("/api/bmOrders", bmOrdersRoutes);
 app.use("/api/attachments", attachmentRoutes);
 app.use("/api/enquiries", enquiriesRoutes);
+app.use("/api/shipstation", shipstationRoutes);
 app.use("/api/notifications", require("./routes/notifications").router);
 
 app.use("/api", backmarketCredsRoutes);
