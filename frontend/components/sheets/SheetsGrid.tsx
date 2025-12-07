@@ -21,8 +21,9 @@ import 'ag-grid-community/styles/ag-theme-alpine.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History, Pencil, ChevronDown, ChevronUp, Filter, AlertCircle, MoreHorizontal } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AttachmentManager } from './AttachmentManager';
 import { SheetHistoryModal } from './SheetHistoryModal';
@@ -35,6 +36,8 @@ import { blockedByOptions, MULTILINE_COLS } from './constants';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useAuth } from '@/hooks/useAuth';
+import { useBusiness } from '@/contexts/BusinessContext';
 import { apiClient } from '@/lib/api';
 import { format } from 'date-fns';
 
@@ -212,6 +215,8 @@ const colorForRow = (r?: SheetRecord): string => {
 /** ==================================== **/
 
 export default function SheetsGrid({ businessId }: { businessId: string }) {
+  const { user } = useAuth();
+  const { businessName } = useBusiness();
   const [isHeaderExpanded, setIsHeaderExpanded] = useState(true);
   const { formatCurrency } = useCurrency(businessId);
   const apiRef = useRef<GridApi<SheetRecord> | null>(null);
@@ -391,6 +396,12 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               const diffTime = now.getTime() - received.getTime();
               const diffDays = diffTime / (1000 * 3600 * 24);
               return diffDays > 14;
+            }
+            case 'ReplacementPending': {
+              const isReplacement = row.return_type === 'Replacement';
+              const repAvail = row.replacement_available;
+              const isPending = !repAvail || (repAvail !== 'Yes' && repAvail !== 'No');
+              return isReplacement && isPending;
             }
 
             // Legend Filters
@@ -878,26 +889,23 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       {
         headerName: 'Actions',
         pinned: 'right',
-        width: 200,
-        minWidth: 200,
-        maxWidth: 240,
+        width: 100,
+        minWidth: 100,
+        maxWidth: 120,
         filter: false,
         resizable: true,
         suppressSizeToFit: true,
-        cellClass: 'p-0 flex items-center justify-center',
+        cellClass: 'p-0 flex items-center justify-center !bg-slate-900 border-l border-slate-800',
         cellRenderer: (p: any) => {
           const orderNumber = p.data?.order_no;
           const computedPlatform = computePlatform(p.data?.order_no || '');
           const platform = computedPlatform === 'Back Market' ? 'backmarket' : 'amazon';
           const hasEnquiry = enquiryCounts[orderNumber] > 0;
 
-          const btnClass = "h-8 w-8 inline-flex items-center justify-center rounded-md text-white group-hover:text-slate-800 hover:bg-white/20 group-hover:hover:bg-slate-200 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2";
-          const activeBtnClass = "h-6 w-6 inline-flex items-center justify-center rounded-md text-white bg-blue-600 hover:bg-blue-900 transition-all";
+          const btnClass = "h-[20px] w-[30px] inline-flex items-center justify-center rounded-md bg-slate-800 border border-slate-700 shadow-sm text-slate-400 hover:bg-slate-700 hover:text-slate-100 transition-all focus:outline-none focus:ring-2 focus:ring-slate-600";
 
           return (
-            <div className="flex items-center justify-end gap-[1px] h-full w-full">
-              
-
+            <div className="flex items-center justify-center gap-1 h-full w-full">
               <button
                 className={btnClass}
                 onClick={() => {
@@ -908,51 +916,60 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                 }}
                 title="Edit Row"
               >
-                <Pencil className="h-4 w-4" />
+                <Pencil className="h-3 w-3" />
               </button>
 
-              <div className="flex-shrink-0">
-                <AttachmentManager
-                  sheetId={p.data?.id}
-                  attachmentCount={attachmentCounts[p.data?.id] || 0}
-                  returnId={buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0)}
-                  onAttachmentChange={() => {
-                    if (p.data?.id) {
-                      apiClient.getAttachments(p.data.id).then(attachments => {
-                        setAttachmentCounts(prev => ({
-                          ...prev,
-                          [p.data.id]: attachments.length
-                        }));
-                      }).catch(() => { });
-                    }
-                  }}
-                />
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className={btnClass}>
+                    <MoreHorizontal className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="p-2 cursor-default">
+                    <div className="flex items-center justify-between w-full">
+                      <span className="text-sm font-medium">Attachments</span>
+                      <AttachmentManager
+                        sheetId={p.data?.id}
+                        attachmentCount={attachmentCounts[p.data?.id] || 0}
+                        returnId={buildReturnId(p.data?.date_received, p.node?.rowIndex ?? 0)}
+                        variant="form"
+                        onAttachmentChange={() => {
+                          if (p.data?.id) {
+                            apiClient.getAttachments(p.data.id).then(attachments => {
+                              setAttachmentCounts(prev => ({
+                                ...prev,
+                                [p.data.id]: attachments.length
+                              }));
+                            }).catch(() => { });
+                          }
+                        }}
+                      />
+                    </div>
+                  </DropdownMenuItem>
+                  
+                  <DropdownMenuItem 
+                    onClick={() => orderNumber && handleEnquiryAction(orderNumber, platform)}
+                    disabled={!orderNumber}
+                  >
+                    <MessageSquare className={cn("mr-2 h-4 w-4", hasEnquiry ? "text-blue-600" : "")} />
+                    <span>{hasEnquiry ? 'View Enquiry' : 'Create Enquiry'}</span>
+                  </DropdownMenuItem>
 
-              <button
-                className={hasEnquiry ? activeBtnClass : btnClass}
-                onClick={() => orderNumber && handleEnquiryAction(orderNumber, platform)}
-                title={hasEnquiry ? 'View existing enquiry' : 'Create new enquiry'}
-                disabled={!orderNumber}
-              >
-                <MessageSquare className="h-4 w-4" />
-              </button>
+                  <DropdownMenuItem onClick={() => p.data && handleViewHistory(p.data)}>
+                    <History className="mr-2 h-4 w-4" />
+                    <span>History</span>
+                  </DropdownMenuItem>
 
-              <button
-                className={btnClass}
-                onClick={() => p.data && handleViewHistory(p.data)}
-                title="View History"
-              >
-                <History className="h-4 w-4" />
-              </button>
-
-              <button
-                className={`${btnClass} hover:text-red-600 hover:bg-red-50`}
-                onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
-                title="Delete row"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
+                  <DropdownMenuItem 
+                    onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    <span>Delete</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div >
           );
         },
@@ -1007,10 +1024,17 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       return diffDays > 14;
     }).length;
 
+    const replacementPending = filteredData.filter(row => {
+      const isReplacement = row.return_type === 'Replacement';
+      const repAvail = row.replacement_available;
+      const isPending = !repAvail || (repAvail !== 'Yes' && repAvail !== 'No');
+      return isReplacement && isPending;
+    }).length;
+
     const total = filteredData.length;
     const actionable = unresolved; // Cases that can be worked on (not blocked, not resolved)
 
-    return { blocked, unresolved, resolved, total, actionable, overdue };
+    return { blocked, unresolved, resolved, total, actionable, overdue, replacementPending };
   }, [filteredData]);
 
 
@@ -1018,36 +1042,72 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
 
   return (
-    <div className="flex flex-col space-y-2 p-2 bg-white rounded-lg shadow-md">
-      {/* Header Toggle Bar */}
-      <div className="flex items-center justify-between px-2 py-1 bg-gray-100 rounded-t-lg border-b cursor-pointer hover:bg-gray-200 transition-colors" onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}>
-        <span className="text-sm font-semibold text-gray-700">Controls & Stats</span>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-          {isHeaderExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </Button>
-      </div>
+    <div className="flex flex-col h-[calc(100vh-10px)] bg-slate-50/50 space-y-2 p-2">
+      {/* Unified Control Panel */}
+      <div className="bg-white rounded-lg border border-slate-200 shadow-sm transition-all">
+        {/* Header Toggle Bar */}
+        <div 
+          className={cn(
+            "flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-slate-50 transition-all group",
+            isHeaderExpanded && "border-b border-slate-100"
+          )}
+          onClick={() => setIsHeaderExpanded(!isHeaderExpanded)}
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div className="p-1 bg-blue-50 text-blue-600 rounded-md group-hover:bg-blue-100 transition-colors">
+                <Filter className="h-3.5 w-3.5" />
+              </div>
+              <span className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Control Panel & Statistics</span>
+            </div>
 
-      {/* Collapsible Header Content */}
-      {isHeaderExpanded && (
-        <div className="flex flex-col space-y-2 p-2 bg-gray-50 rounded-b-lg border border-t-0 animate-in slide-in-from-top-2 duration-200">
+            {/* Marketplace Totals */}
+            <div className="hidden md:flex items-center gap-4 text-xs bg-slate-50 px-3 py-1.5 rounded border border-slate-100 shadow-sm" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 font-medium">Amazon:</span>
+                <span className="font-bold text-slate-900">{formatCurrency(totals.amazon)}</span>
+              </div>
+              <div className="w-px h-3 bg-slate-200"></div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 font-medium">Back Market:</span>
+                <span className="font-bold text-slate-900">{formatCurrency(totals.backmarket)}</span>
+              </div>
+              <div className="w-px h-3 bg-slate-200"></div>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-500 font-medium">Total:</span>
+                <span className="font-bold text-slate-900">{formatCurrency(totals.total)}</span>
+              </div>
+            </div>
+          </div>
+
+          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-slate-400 group-hover:text-slate-600">
+            {isHeaderExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+          </Button>
+        </div>
+
+        {/* Collapsible Header Content */}
+        {isHeaderExpanded && (
+          <div className="flex flex-col space-y-2 p-2 animate-in slide-in-from-top-2 duration-200">
           {/* Top Controls Bar: Filters + Search + Actions */}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
               {/* Date Range Filter */}
-              <div className="flex items-center gap-1">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-[13px] text-muted-foreground font-medium">Date:</span>
+              <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-md border border-slate-100">
+                <div className="px-2 flex items-center gap-1.5 border-r border-slate-200">
+                  <Calendar className="h-3.5 w-3.5 text-slate-500" />
+                  <span className="text-[11px] font-medium text-slate-600">Date</span>
+                </div>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
-                      variant={"outline"}
+                      variant={"ghost"}
                       size="sm"
                       className={cn(
-                        "w-36 h-9 text-[13px] justify-start text-left font-normal px-2",
+                        "h-7 text-[11px] justify-start text-left font-normal px-2 hover:bg-white",
                         !dateFrom && "text-muted-foreground"
                       )}
                     >
-                      {dateFrom ? format(new Date(dateFrom), "dd-MM-yyyy") : <span>From</span>}
+                      {dateFrom ? format(new Date(dateFrom), "dd/MM/yyyy") : <span>Start</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -1060,18 +1120,18 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                   </PopoverContent>
                 </Popover>
 
-                <span className="text-[13px] text-muted-foreground">-</span>
+                <span className="text-slate-300 text-[10px]">→</span>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
-                      variant={"outline"}
+                      variant={"ghost"}
                       size="sm"
                       className={cn(
-                        "w-36 h-9 text-[13px] justify-start text-left font-normal px-2",
+                        "h-7 text-[11px] justify-start text-left font-normal px-2 hover:bg-white",
                         !dateTo && "text-muted-foreground"
                       )}
                     >
-                      {dateTo ? format(new Date(dateTo), "dd-MM-yyyy") : <span>To</span>}
+                      {dateTo ? format(new Date(dateTo), "dd/MM/yyyy") : <span>End</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -1084,17 +1144,17 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                   </PopoverContent>
                 </Popover>
                 {isDateFiltered && (
-                  <Button variant="ghost" size="sm" onClick={clearDateFilter} className="h-9 w-9 p-0">
-                    <RotateCcw className="h-4 w-4" />
+                  <Button variant="ghost" size="sm" onClick={clearDateFilter} className="h-7 w-7 p-0 hover:bg-red-50 hover:text-red-600">
+                    <RotateCcw className="h-3 w-3" />
                   </Button>
                 )}
               </div>
 
               {/* Platform Filter */}
-              <div className="flex items-center gap-1">
-                <span className="text-[13px] text-muted-foreground font-medium">Platform:</span>
+              <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-md border border-slate-100">
+                <span className="text-[11px] font-medium text-slate-600 px-2 border-r border-slate-200">Platform</span>
                 <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                  <SelectTrigger className="w-36 h-9 text-[13px]">
+                  <SelectTrigger className="w-28 h-7 text-[11px] border-0 bg-transparent focus:ring-0">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1106,27 +1166,36 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               </div>
 
               {/* Search Bar */}
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <div className="relative group">
+                <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
                 <Input
-                  placeholder="Search Order/Customer..."
+                  placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 w-60 h-9 text-[13px]"
+                  className="pl-8 w-48 h-8 text-xs bg-slate-50 border-slate-200 focus:bg-white transition-all"
                 />
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-1">
-              <Button size="sm" className="h-9 text-[13px] gap-1" onClick={addRow}><Plus className="h-4 w-4" /> New</Button>
-              <Button variant="outline" size="sm" className="h-9 text-[13px] gap-1" onClick={removeSelected}><Trash2 className="h-4 w-4" /> Delete</Button>
-              <Button variant="outline" size="sm" className="h-9 text-[13px] gap-1" onClick={handleHistoryClick}><History className="h-4 w-4" /> History</Button>
-              <Button variant="outline" size="sm" className="h-9 text-[13px] gap-1" onClick={refresh}><RotateCcw className="h-4 w-4" /> Refresh</Button>
+            <div className="flex items-center gap-1.5 w-full lg:w-auto justify-end">
+              <Button size="sm" className="h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white shadow-sm px-3" onClick={addRow}>
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> New
+              </Button>
+              <div className="h-5 w-px bg-slate-200 mx-0.5" />
+              <Button variant="outline" size="sm" className="h-8 text-xs hover:bg-red-50 hover:text-red-600 hover:border-red-200 px-2" onClick={removeSelected}>
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={handleHistoryClick}>
+                <History className="h-3.5 w-3.5 mr-1" /> History
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={refresh}>
+                <RotateCcw className="h-3.5 w-3.5 mr-1" /> Refresh
+              </Button>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-9 text-[13px] gap-1"
+                className="h-8 text-xs px-2"
                 onClick={() => {
                   const ws = XLSX.utils.json_to_sheet(filteredData.map(row => ({
                     ...row,
@@ -1140,93 +1209,107 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                   XLSX.writeFile(wb, `sheets_export_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`);
                 }}
               >
-                <Download className="h-4 w-4" /> XLS
+                <Download className="h-3.5 w-3.5 mr-1" /> Export
               </Button>
             </div>
           </div>
 
           {/* Stats Row: Status + Marketplace */}
-          <div className="flex flex-col gap-2 p-2 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border">
-            {statusStats.overdue > 0 && (
-              <div className="px-2 py-1 bg-red-50 border border-red-200 rounded text-red-700 text-[13px] font-medium flex items-center gap-2">
-                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                {statusStats.overdue} returns received 14+ days ago. Please review urgently.
-              </div>
-            )}
+          <div className="flex flex-col gap-2">
             
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 p-2 bg-slate-50/50 rounded-lg border border-slate-100">
               <div className="flex flex-wrap gap-2">
                 <div
                   onClick={() => toggleFilter('Blocked')}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-all ${activeFilter === 'Blocked' ? 'ring-1 ring-red-500 bg-red-100' : 'bg-red-50 border-red-100 hover:bg-red-100'}`}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-red-500 text-white",
+                    activeFilter === 'Blocked' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                  )}
                 >
-                  <div className="w-2.5 h-2.5 bg-red-500 rounded-full"></div>
-                  <span className="text-red-700 font-medium text-[13px]">Blocked:</span>
-                  <span className="text-[15px] font-bold text-red-800">{statusStats.blocked}</span>
+                  <span className="font-light text-[10px] uppercase tracking-wide">Blocked</span>
+                  <span className="text-sm font-bold">{statusStats.blocked}</span>
                 </div>
+
                 <div
                   onClick={() => toggleFilter('Actionable')}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-all ${activeFilter === 'Actionable' ? 'ring-1 ring-yellow-500 bg-yellow-100' : 'bg-yellow-50 border-yellow-100 hover:bg-yellow-100'}`}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-amber-500 text-white",
+                    activeFilter === 'Actionable' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                  )}
                 >
-                  <div className="w-2.5 h-2.5 bg-yellow-500 rounded-full"></div>
-                  <span className="text-yellow-700 font-medium text-[13px]">Actionable:</span>
-                  <span className="text-[15px] font-bold text-yellow-800">{statusStats.actionable}</span>
+                  <span className="font-light text-[10px] uppercase tracking-wide">Actionable</span>
+                  <span className="text-sm font-bold">{statusStats.actionable}</span>
                 </div>
+
                 <div
                   onClick={() => toggleFilter('Resolved')}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-all ${activeFilter === 'Resolved' ? 'ring-1 ring-green-500 bg-green-100' : 'bg-green-50 border-green-100 hover:bg-green-100'}`}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-emerald-500 text-white",
+                    activeFilter === 'Resolved' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                  )}
                 >
-                  <div className="w-2.5 h-2.5 bg-green-500 rounded-full"></div>
-                  <span className="text-green-700 font-medium text-[13px]">Resolved:</span>
-                  <span className="text-[15px] font-bold text-green-800">{statusStats.resolved}</span>
+                  <span className="font-light text-[10px] uppercase tracking-wide">Resolved</span>
+                  <span className="text-sm font-bold">{statusStats.resolved}</span>
                 </div>
                 
-                <div className="flex items-center gap-1.5 bg-blue-50 px-2 py-1 rounded border border-blue-100">
-                  <div className="w-2.5 h-2.5 bg-blue-500 rounded-full"></div>
-                  <span className="text-blue-700 font-medium text-[13px]">Total:</span>
-                  <span className="text-[15px] font-bold text-blue-800">{statusStats.total}</span>
+                <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-transparent shadow-sm bg-blue-500 text-white">
+                  <span className="font-light text-[10px] uppercase tracking-wide">Total</span>
+                  <span className="text-sm font-bold">{statusStats.total}</span>
                 </div>
+
                 {statusStats.total > 0 && (
-                  <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded border border-slate-100">
-                    <div className="w-2.5 h-2.5 bg-slate-500 rounded-full"></div>
-                    <span className="text-slate-700 font-medium text-[13px]">Progress:</span>
-                    <span className="text-[15px] font-bold text-slate-800">
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-transparent shadow-sm bg-slate-400 text-white">
+                    <span className="font-light text-[10px] uppercase tracking-wide">Progress</span>
+                    <span className="text-sm font-bold">
                       {Math.round((statusStats.resolved / statusStats.total) * 100)}%
                     </span>
                   </div>
                 )}
+
                 <div
                   onClick={() => toggleFilter('Overdue')}
-                  className={`flex items-center gap-1.5 px-2 py-1 rounded border cursor-pointer transition-all ${activeFilter === 'Overdue' ? 'ring-1 ring-red-500 bg-red-700 text-white' : 'bg-red-600 border-red-600 text-white hover:bg-red-700'}`}
+                  className={cn(
+                    "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-rose-500 text-white",
+                    activeFilter === 'Overdue' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                  )}
                 >
-                  <div className="w-2.5 h-2.5 bg-white rounded-full"></div>
-                  <span className="font-medium text-[13px] text-white">14+ Days:</span>
-                  <span className="text-[15px] font-bold text-white">{statusStats.overdue}</span>
+                  <span className="font-light text-[10px] uppercase tracking-wide">14+ Days</span>
+                  <span className="text-sm font-bold">{statusStats.overdue}</span>
                 </div>
               </div>
 
-              {/* Marketplace Totals */}
-              <div className="flex items-center gap-3 text-[13px] ml-auto">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-blue-700 font-medium">Amazon (Today):</span>
-                  <span className="font-bold text-blue-800">{formatCurrency(totals.amazon)}</span>
-                </div>
-                <div className="w-px h-3 bg-gray-300"></div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-green-700 font-medium">BM (Today):</span>
-                  <span className="font-bold text-green-800">{formatCurrency(totals.backmarket)}</span>
-                </div>
-                <div className="w-px h-3 bg-gray-300"></div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-slate-700 font-medium">Total:</span>
-                  <span className="font-bold text-slate-900">{formatCurrency(totals.total)}</span>
-                </div>
+              <div className="flex flex-col gap-2 items-end">
+                {statusStats.overdue > 0 && user?.username?.toLowerCase().startsWith('cs') && (
+                  <div 
+                    onClick={() => toggleFilter('Overdue')}
+                    className={cn(
+                      "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
+                      activeFilter === 'Overdue' ? 'ring-2 ring-red-200 bg-red-100' : ''
+                    )}
+                  >
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Warning for Techezm: {statusStats.overdue} returns received 14+ days ago. Please review urgently.</span>
+                  </div>
+                )}
+
+                {statusStats.replacementPending > 0 && !user?.username?.toLowerCase().startsWith('cs') && (
+                  <div 
+                    onClick={() => toggleFilter('ReplacementPending')}
+                    className={cn(
+                      "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
+                      activeFilter === 'ReplacementPending' ? 'ring-2 ring-red-200 bg-red-100' : ''
+                    )}
+                  >
+                    <AlertCircle className="h-4 w-4" />
+                    <span>Warning for {businessName ?? "Business"}: There are {statusStats.replacementPending} returns with Replacement Available Pending, please review them urgently.</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
           {/* Interactive Legend */}
-          <div className="flex flex-wrap gap-2 text-[11px] mb-0">
+          <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-100">
             {[
               ['#166534', 'Resolved', 'Legend_Resolved'],
               ['#F59E0B', 'Awaiting Customer/BM', 'Legend_Awaiting Customer/BM'],
@@ -1242,27 +1325,29 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               <div
                 key={hex}
                 onClick={() => toggleFilter(filterKey)}
-                className={`flex items-center gap-1.5 px-1.5 py-0.5 rounded border cursor-pointer transition-all ${activeFilter === filterKey
-                  ? 'ring-1 ring-gray-400 bg-gray-100'
-                  : 'hover:bg-gray-50'
-                  }`}
+                style={{ backgroundColor: hex, color: pickTextColor(hex) }}
+                className={cn(
+                  "flex items-center justify-center px-3 py-0.5 rounded-full border border-transparent cursor-pointer transition-all text-[10px] font-light uppercase tracking-wide shadow-sm hover:opacity-90",
+                  activeFilter === filterKey ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                )}
               >
-                <span style={{ backgroundColor: hex, width: 12, height: 12, borderRadius: 2 }} />
                 <span>{label}</span>
               </div>
             ))}
           </div>
         </div>
       )}
+      </div>
 
-      <div className="ag-theme-alpine" style={{ width: '100%', height: isHeaderExpanded ? '65vh' : '85vh', borderRadius: '0.5rem' }}>
+      <div className="ag-theme-alpine flex-1 w-full rounded-lg border border-slate-200 shadow-sm overflow-hidden bg-white">
         <AgGridReact<SheetRecord>
           onGridReady={onGridReady}
           rowData={filteredData}
           columnDefs={colDefs}
           rowSelection="multiple"
           rowClass="group"
-          rowHeight={27}
+          rowHeight={32}
+          headerHeight={40}
           animateRows
           enableCellTextSelection
           onFirstDataRendered={onFirstDataRendered}
@@ -1278,14 +1363,15 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             minWidth: 40,
             wrapText: true,
             autoHeight: true,
-            cellClass: 'px-2 py-1 border border-gray-200 flex items-center justify-center text-center break-words leading-tight',
+            cellClass: 'px-2 py-1 border-r border-slate-100 flex items-center justify-center text-center break-words leading-tight text-xs',
+            headerClass: 'bg-slate-50 text-slate-500 font-semibold text-xs uppercase tracking-wider',
           }}
           getRowId={p => String(p.data?.id ?? Math.random())}
-          getRowClass={() => 'group'}
+          getRowClass={() => 'group hover:bg-slate-50/50 transition-colors'}
           getRowStyle={(params) => {
             const bg = colorForRow(params.data);
             const color = pickTextColor(bg);
-            return { backgroundColor: bg, color };
+            return { backgroundColor: bg, color, borderBottom: '1px solid rgba(0,0,0,0.05)' };
           }}
         />
       </div>
