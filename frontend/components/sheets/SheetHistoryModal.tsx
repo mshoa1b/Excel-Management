@@ -125,6 +125,11 @@ export function SheetHistoryModal({ businessId, sheetId, currentRow, open, onOpe
 
     const formatDate = (val?: string) => {
         if (!val || val === 'Current') return val === 'Current' ? 'Current' : '-';
+        // Handle yyyy-MM-dd strings directly to avoid timezone shifts
+        if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+            const [y, m, d] = val.split('-');
+            return `${d}-${m}-${y}`;
+        }
         try {
             return format(new Date(val), 'dd-MM-yyyy');
         } catch { return val; }

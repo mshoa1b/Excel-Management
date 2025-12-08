@@ -251,7 +251,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       const response = await apiClient.request(`/enquiries?order_number=${encodeURIComponent(orderNumber)}`);
       // Handle paginated response structure
       const enquiries = response.data || response;
-      
+
       if (!Array.isArray(enquiries)) return null;
 
       // Find exact match (the backend does partial match, so we filter here)
@@ -845,7 +845,14 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   // Remove custom DateCellEditor - using ag-Grid's built-in agDateStringCellEditor instead
 
   // Formatters and parsers
-  const dateFormatter = (p: any) => (p.value ? format(new Date(p.value), 'dd-MM-yyyy') : '');
+  const dateFormatter = (p: any) => {
+    if (!p.value) return '';
+    // Use toYMD to get a consistent YYYY-MM-DD string first, avoiding timezone shifts
+    const ymd = toYMD(p.value);
+    if (!ymd) return '';
+    const [y, m, d] = ymd.split('-');
+    return `${d}-${m}-${y}`;
+  };
   const dateParser = (p: any) => {
     // If newValue is null, undefined, or empty string, allow clearing the date
     if (p.newValue == null || p.newValue === '') {
@@ -863,7 +870,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
   // Columns
   const colDefs: ColDef<SheetRecord>[] = useMemo(
     () => [
-      
+
       {
         colId: 'rowNum',
         headerName: '#',
@@ -933,7 +940,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                     <span className="font-medium text-slate-900">{typeof row.refund_amount === 'number' ? formatCurrency(row.refund_amount) : formatCurrency(0)}</span>
 
                     <span className="text-slate-500">Refund Date:</span>
-                    <span className="font-medium text-slate-900">{row.refund_date ? format(new Date(row.refund_date), 'dd-MM-yyyy') : '-'}</span>
+                    <span className="font-medium text-slate-900">{row.refund_date ? toYMD(row.refund_date).split('-').reverse().join('-') : '-'}</span>
 
                     <span className="text-slate-500">Last Updated:</span>
                     <span className="font-medium text-slate-900">{row.updated_at ? format(new Date(row.updated_at), 'dd-MM-yyyy HH:mm') : '-'}</span>
@@ -945,7 +952,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         }
       },
       { headerName: 'Blocked By', field: 'blocked_by', editable: false, pinned: 'left' },
-      
+
       { headerName: 'Date Received', field: 'date_received', editable: false, valueFormatter: dateFormatter, },
       { headerName: 'Order Date', field: 'order_date', editable: false, valueFormatter: dateFormatter, },
       { headerName: 'Customer Name', field: 'customer_name', editable: false },
@@ -954,24 +961,24 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       { headerName: 'Customer Comment', field: 'customer_comment', editable: false, wrapText: true, autoHeight: true, width: 260 },
       { headerName: 'Multiple Return', field: 'multiple_return', editable: false },
       { headerName: 'Return Type', field: 'return_type', editable: false },
-      
+
       { headerName: 'Locked', field: 'locked', editable: false },
       { headerName: 'OOW Case', field: 'oow_case', editable: false },
       { headerName: 'Out of Warranty', field: 'out_of_warranty', editable: false },
       { headerName: 'Replacement Available', field: 'replacement_available', editable: false },
       { headerName: 'Resolution', field: 'resolution', editable: false },
-      
-      { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: false }, 
+
+      { headerName: 'Return Tracking No', field: 'return_tracking_no', editable: false },
       { headerName: 'Refund Amount', field: 'refund_amount', editable: false, valueFormatter: (p) => typeof p.value === 'number' ? formatCurrency(p.value) : formatCurrency(0) },
       { headerName: 'Refund Date', field: 'refund_date', editable: false, valueFormatter: dateFormatter, },
 
       { headerName: 'CS Comments', field: 'cs_comment', editable: false, wrapText: true, autoHeight: true, width: 260 },
       { headerName: 'Additional Notes', field: 'additional_notes', editable: false, wrapText: true, autoHeight: true, width: 260 },
       { headerName: 'Manager Notes', field: 'manager_notes', editable: false, wrapText: true, autoHeight: true, width: 260 },
-            
+
       { headerName: 'Return within 30 days', field: 'return_within_30_days', editable: false, valueGetter: p => computeWithin30(p.data?.date_received ?? '', p.data?.order_date ?? '') },
       { headerName: 'Platform', field: 'platform', editable: false, valueGetter: p => computePlatform(p.data?.order_no ?? '') },
-      { headerName: 'Issue', field: 'issue', editable: false },   
+      { headerName: 'Issue', field: 'issue', editable: false },
       { headerName: 'Done By', field: 'done_by', editable: false },
       { headerName: 'Status', field: 'status', editable: false },
       { headerName: 'Last Updated', field: 'updated_at', editable: false, valueFormatter: (p) => p.value ? format(new Date(p.value), 'dd-MM-yyyy HH:mm') : '' },
@@ -1036,8 +1043,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                       />
                     </div>
                   </DropdownMenuItem>
-                  
-                  <DropdownMenuItem 
+
+                  <DropdownMenuItem
                     onClick={() => orderNumber && handleEnquiryAction(orderNumber, platform)}
                     disabled={!orderNumber}
                   >
@@ -1050,7 +1057,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                     <span>History</span>
                   </DropdownMenuItem>
 
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={() => p.data?.id && handleSingleRowDelete(p.data.id)}
                     className="text-red-600 focus:text-red-600 focus:bg-red-50"
                   >
@@ -1139,7 +1146,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       {/* Unified Control Panel */}
       <div className="bg-white rounded-lg border border-slate-200 shadow-sm transition-all">
         {/* Header Toggle Bar */}
-        <div 
+        <div
           className={cn(
             "flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-slate-50 transition-all group",
             isHeaderExpanded && "border-b border-slate-100"
@@ -1181,265 +1188,251 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
         {/* Collapsible Header Content */}
         {isHeaderExpanded && (
           <div className="flex flex-col space-y-2 p-2 animate-in slide-in-from-top-2 duration-200">
-          {/* Top Controls Bar: Filters + Search + Actions */}
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-              {/* Date Range Filter */}
-              <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-md border border-slate-100">
-                <div className="px-2 flex items-center gap-1.5 border-r border-slate-200">
-                  <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                  <span className="text-[11px] font-medium text-slate-600">Date</span>
-                </div>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"ghost"}
-                      size="sm"
-                      className={cn(
-                        "h-7 text-[11px] justify-start text-left font-normal px-2 hover:bg-white",
-                        !dateFrom && "text-muted-foreground"
-                      )}
-                    >
-                      {dateFrom ? format(new Date(dateFrom), "dd/MM/yyyy") : <span>Start</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={dateFrom ? new Date(dateFrom) : undefined}
-                      onSelect={(d) => setDateFrom(d ? format(d, 'yyyy-MM-dd') : '')}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-
-                <span className="text-slate-300 text-[10px]">→</span>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"ghost"}
-                      size="sm"
-                      className={cn(
-                        "h-7 text-[11px] justify-start text-left font-normal px-2 hover:bg-white",
-                        !dateTo && "text-muted-foreground"
-                      )}
-                    >
-                      {dateTo ? format(new Date(dateTo), "dd/MM/yyyy") : <span>End</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <CalendarComponent
-                      mode="single"
-                      selected={dateTo ? new Date(dateTo) : undefined}
-                      onSelect={(d) => setDateTo(d ? format(d, 'yyyy-MM-dd') : '')}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
-                {isDateFiltered && (
-                  <Button variant="ghost" size="sm" onClick={clearDateFilter} className="h-7 w-7 p-0 hover:bg-red-50 hover:text-red-600">
-                    <RotateCcw className="h-3 w-3" />
-                  </Button>
-                )}
-              </div>
-
-              {/* Platform Filter */}
-              <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-md border border-slate-100">
-                <span className="text-[11px] font-medium text-slate-600 px-2 border-r border-slate-200">Platform</span>
-                <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                  <SelectTrigger className="w-28 h-7 text-[11px] border-0 bg-transparent focus:ring-0">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All</SelectItem>
-                    <SelectItem value="Amazon">Amazon</SelectItem>
-                    <SelectItem value="Back Market">Back Market</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Search Bar */}
-              <div className="relative group">
-                <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
-                <Input
-                  placeholder="Search..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 w-48 h-8 text-xs bg-slate-50 border-slate-200 focus:bg-white transition-all"
-                />
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-1.5 w-full lg:w-auto justify-end">
-              <Button size="sm" className="h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white shadow-sm px-3" onClick={addRow}>
-                <Plus className="h-3.5 w-3.5 mr-1.5" /> New
-              </Button>
-              <div className="h-5 w-px bg-slate-200 mx-0.5" />
-              <Button variant="outline" size="sm" className="h-8 text-xs hover:bg-red-50 hover:text-red-600 hover:border-red-200 px-2" onClick={removeSelected}>
-                <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={handleHistoryClick}>
-                <History className="h-3.5 w-3.5 mr-1" /> History
-              </Button>
-              <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={refresh}>
-                <RotateCcw className="h-3.5 w-3.5 mr-1" /> Refresh
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs px-2"
-                onClick={() => {
-                  const ws = XLSX.utils.json_to_sheet(filteredData.map(row => ({
-                    ...row,
-                    date_received: row.date_received ? format(new Date(row.date_received), 'dd/MM/yyyy') : '',
-                    order_date: row.order_date ? format(new Date(row.order_date), 'dd/MM/yyyy') : '',
-                    refund_date: row.refund_date ? format(new Date(row.refund_date), 'dd/MM/yyyy') : '',
-                    updated_at: row.updated_at ? format(new Date(row.updated_at), 'dd/MM/yyyy HH:mm') : ''
-                  })));
-                  const wb = XLSX.utils.book_new();
-                  XLSX.utils.book_append_sheet(wb, ws, "Sheets");
-                  XLSX.writeFile(wb, `sheets_export_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.xlsx`);
-                }}
-              >
-                <Download className="h-3.5 w-3.5 mr-1" /> Export
-              </Button>
-            </div>
-          </div>
-
-          {/* Stats Row: Status + Marketplace */}
-          <div className="flex flex-col gap-2">
-            
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 p-2 bg-slate-50/50 rounded-lg border border-slate-100">
-              <div className="flex flex-wrap gap-2">
-                <div
-                  onClick={() => toggleFilter('Blocked')}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-red-500 text-white",
-                    activeFilter === 'Blocked' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
-                  )}
-                >
-                  <span className="font-light text-[10px] uppercase tracking-wide">Blocked</span>
-                  <span className="text-sm font-bold">{statusStats.blocked}</span>
-                </div>
-
-                <div
-                  onClick={() => toggleFilter('Actionable')}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-amber-500 text-white",
-                    activeFilter === 'Actionable' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
-                  )}
-                >
-                  <span className="font-light text-[10px] uppercase tracking-wide">Actionable</span>
-                  <span className="text-sm font-bold">{statusStats.actionable}</span>
-                </div>
-
-                <div
-                  onClick={() => toggleFilter('Resolved')}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-emerald-500 text-white",
-                    activeFilter === 'Resolved' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
-                  )}
-                >
-                  <span className="font-light text-[10px] uppercase tracking-wide">Resolved</span>
-                  <span className="text-sm font-bold">{statusStats.resolved}</span>
-                </div>
-                
-                <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-transparent shadow-sm bg-blue-500 text-white">
-                  <span className="font-light text-[10px] uppercase tracking-wide">Total</span>
-                  <span className="text-sm font-bold">{statusStats.total}</span>
-                </div>
-
-                {statusStats.total > 0 && (
-                  <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-transparent shadow-sm bg-slate-400 text-white">
-                    <span className="font-light text-[10px] uppercase tracking-wide">Progress</span>
-                    <span className="text-sm font-bold">
-                      {Math.round((statusStats.resolved / statusStats.total) * 100)}%
-                    </span>
+            {/* Top Controls Bar: Filters + Search + Actions */}
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+                {/* Date Range Filter */}
+                <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-md border border-slate-100">
+                  <div className="px-2 flex items-center gap-1.5 border-r border-slate-200">
+                    <Calendar className="h-3.5 w-3.5 text-slate-500" />
+                    <span className="text-[11px] font-medium text-slate-600">Date</span>
                   </div>
-                )}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"ghost"}
+                        size="sm"
+                        className={cn(
+                          "h-7 text-[11px] justify-start text-left font-normal px-2 hover:bg-white",
+                          !dateFrom && "text-muted-foreground"
+                        )}
+                      >
+                        {dateFrom ? format(new Date(dateFrom), "dd-MM-yyyy") : <span>Start</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={dateFrom ? new Date(dateFrom) : undefined}
+                        onSelect={(d) => setDateFrom(d ? format(d, 'yyyy-MM-dd') : '')}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
 
-                <div
-                  onClick={() => toggleFilter('Overdue')}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-rose-500 text-white",
-                    activeFilter === 'Overdue' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                  <span className="text-slate-300 text-[10px]">→</span>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"ghost"}
+                        size="sm"
+                        className={cn(
+                          "h-7 text-[11px] justify-start text-left font-normal px-2 hover:bg-white",
+                          !dateTo && "text-muted-foreground"
+                        )}
+                      >
+                        {dateTo ? format(new Date(dateTo), "dd-MM-yyyy") : <span>End</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <CalendarComponent
+                        mode="single"
+                        selected={dateTo ? new Date(dateTo) : undefined}
+                        onSelect={(d) => setDateTo(d ? format(d, 'yyyy-MM-dd') : '')}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {isDateFiltered && (
+                    <Button variant="ghost" size="sm" onClick={clearDateFilter} className="h-7 w-7 p-0 hover:bg-red-50 hover:text-red-600">
+                      <RotateCcw className="h-3 w-3" />
+                    </Button>
                   )}
-                >
-                  <span className="font-light text-[10px] uppercase tracking-wide">14+ Days</span>
-                  <span className="text-sm font-bold">{statusStats.overdue}</span>
+                </div>
+
+                {/* Platform Filter */}
+                <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-md border border-slate-100">
+                  <span className="text-[11px] font-medium text-slate-600 px-2 border-r border-slate-200">Platform</span>
+                  <Select value={platformFilter} onValueChange={setPlatformFilter}>
+                    <SelectTrigger className="w-28 h-7 text-[11px] border-0 bg-transparent focus:ring-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">All</SelectItem>
+                      <SelectItem value="Amazon">Amazon</SelectItem>
+                      <SelectItem value="Back Market">Back Market</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Search Bar */}
+                <div className="relative group">
+                  <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-8 w-48 h-8 text-xs bg-slate-50 border-slate-200 focus:bg-white transition-all"
+                  />
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2 items-end">
-                {statusStats.overdue > 0 && user?.username?.toLowerCase().startsWith('cs') && (
-                  <div 
+              {/* Action Buttons */}
+              <div className="flex items-center gap-1.5 w-full lg:w-auto justify-end">
+                <Button size="sm" className="h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white shadow-sm px-3" onClick={addRow}>
+                  <Plus className="h-3.5 w-3.5 mr-1.5" /> New
+                </Button>
+                <div className="h-5 w-px bg-slate-200 mx-0.5" />
+                <Button variant="outline" size="sm" className="h-8 text-xs hover:bg-red-50 hover:text-red-600 hover:border-red-200 px-2" onClick={removeSelected}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={handleHistoryClick}>
+                  <History className="h-3.5 w-3.5 mr-1" /> History
+                </Button>
+                <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={refresh}>
+                  <RotateCcw className="h-3.5 w-3.5 mr-1" /> Refresh
+                </Button>
+                <Button
+                  variant="outline"
+                >
+                  <Download className="h-3.5 w-3.5 mr-1" /> Export
+                </Button>
+              </div>
+            </div>
+
+            {/* Stats Row: Status + Marketplace */}
+            <div className="flex flex-col gap-2">
+
+              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 p-2 bg-slate-50/50 rounded-lg border border-slate-100">
+                <div className="flex flex-wrap gap-2">
+                  <div
+                    onClick={() => toggleFilter('Blocked')}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-red-500 text-white",
+                      activeFilter === 'Blocked' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                    )}
+                  >
+                    <span className="font-light text-[10px] uppercase tracking-wide">Blocked</span>
+                    <span className="text-sm font-bold">{statusStats.blocked}</span>
+                  </div>
+
+                  <div
+                    onClick={() => toggleFilter('Actionable')}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-amber-500 text-white",
+                      activeFilter === 'Actionable' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                    )}
+                  >
+                    <span className="font-light text-[10px] uppercase tracking-wide">Actionable</span>
+                    <span className="text-sm font-bold">{statusStats.actionable}</span>
+                  </div>
+
+                  <div
+                    onClick={() => toggleFilter('Resolved')}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-emerald-500 text-white",
+                      activeFilter === 'Resolved' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                    )}
+                  >
+                    <span className="font-light text-[10px] uppercase tracking-wide">Resolved</span>
+                    <span className="text-sm font-bold">{statusStats.resolved}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-transparent shadow-sm bg-blue-500 text-white">
+                    <span className="font-light text-[10px] uppercase tracking-wide">Total</span>
+                    <span className="text-sm font-bold">{statusStats.total}</span>
+                  </div>
+
+                  {statusStats.total > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-transparent shadow-sm bg-slate-400 text-white">
+                      <span className="font-light text-[10px] uppercase tracking-wide">Progress</span>
+                      <span className="text-sm font-bold">
+                        {Math.round((statusStats.resolved / statusStats.total) * 100)}%
+                      </span>
+                    </div>
+                  )}
+
+                  <div
                     onClick={() => toggleFilter('Overdue')}
                     className={cn(
-                      "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
-                      activeFilter === 'Overdue' ? 'ring-2 ring-red-200 bg-red-100' : ''
+                      "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-rose-500 text-white",
+                      activeFilter === 'Overdue' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
                     )}
                   >
-                    <AlertCircle className="h-4 w-4" />
-                    <span>Warning for Techezm: {statusStats.overdue} returns received 14+ days ago. Please review urgently.</span>
+                    <span className="font-light text-[10px] uppercase tracking-wide">14+ Days</span>
+                    <span className="text-sm font-bold">{statusStats.overdue}</span>
                   </div>
-                )}
+                </div>
 
-                {statusStats.replacementPending > 0 && !user?.username?.toLowerCase().startsWith('cs') && (
-                  <div 
-                    onClick={() => toggleFilter('ReplacementPending')}
-                    className={cn(
-                      "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
-                      activeFilter === 'ReplacementPending' ? 'ring-2 ring-red-200 bg-red-100' : ''
-                    )}
-                  >
-                    <AlertCircle className="h-4 w-4" />
-                    <span>Warning for {businessName ?? "Business"}: There are {statusStats.replacementPending} returns with Replacement Available Pending, please review them urgently.</span>
-                  </div>
-                )}
+                <div className="flex flex-col gap-2 items-end">
+                  {statusStats.overdue > 0 && user?.username?.toLowerCase().startsWith('cs') && (
+                    <div
+                      onClick={() => toggleFilter('Overdue')}
+                      className={cn(
+                        "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
+                        activeFilter === 'Overdue' ? 'ring-2 ring-red-200 bg-red-100' : ''
+                      )}
+                    >
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Warning for Techezm: {statusStats.overdue} returns received 14+ days ago. Please review urgently.</span>
+                    </div>
+                  )}
 
-                {statusStats.resolutionIsChoose > 0 && !user?.username?.toLowerCase().startsWith('cs') && (
-                  <div 
-                    onClick={() => toggleFilter('ResolutionPending')}
-                    className={cn(
-                      "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
-                      activeFilter === 'ResolutionPending' ? 'ring-2 ring-red-200 bg-red-100' : ''
-                    )}
-                  >
-                    <AlertCircle className="h-4 w-4" />
-                    <span>Warning for {businessName ?? "Business"}: There are {statusStats.resolutionIsChoose} returns with Resolution Pending, please review them urgently.</span>
-                  </div>
-                )}
+                  {statusStats.replacementPending > 0 && !user?.username?.toLowerCase().startsWith('cs') && (
+                    <div
+                      onClick={() => toggleFilter('ReplacementPending')}
+                      className={cn(
+                        "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
+                        activeFilter === 'ReplacementPending' ? 'ring-2 ring-red-200 bg-red-100' : ''
+                      )}
+                    >
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Warning for {businessName ?? "Business"}: There are {statusStats.replacementPending} returns with Replacement Available Pending, please review them urgently.</span>
+                    </div>
+                  )}
+
+                  {statusStats.resolutionIsChoose > 0 && !user?.username?.toLowerCase().startsWith('cs') && (
+                    <div
+                      onClick={() => toggleFilter('ResolutionPending')}
+                      className={cn(
+                        "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
+                        activeFilter === 'ResolutionPending' ? 'ring-2 ring-red-200 bg-red-100' : ''
+                      )}
+                    >
+                      <AlertCircle className="h-4 w-4" />
+                      <span>Warning for {businessName ?? "Business"}: There are {statusStats.resolutionIsChoose} returns with Resolution Pending, please review them urgently.</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Interactive Legend */}
-          <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-100">
-            {[
-              ['#166534', 'Resolved', 'Legend_Resolved'],
-              ['#F59E0B', 'Awaiting Customer/BM', 'Legend_Awaiting Customer/BM'],
-              ['#1D4ED8', 'Awaiting G&I', 'Legend_Awaiting G&I'],
-              ['#F97316', 'Awaiting Techezm', 'Legend_Awaiting Techezm'],
-              ['#DB2777', 'Awaiting Replacement', 'Legend_Awaiting Replacement'],
-              ['#6B7280', 'Blocked', 'Legend_Blocked'],
+            {/* Interactive Legend */}
+            <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-100">
+              {[
+                ['#166534', 'Resolved', 'Legend_Resolved'],
+                ['#F59E0B', 'Awaiting Customer/BM', 'Legend_Awaiting Customer/BM'],
+                ['#1D4ED8', 'Awaiting G&I', 'Legend_Awaiting G&I'],
+                ['#F97316', 'Awaiting Techezm', 'Legend_Awaiting Techezm'],
+                ['#DB2777', 'Awaiting Replacement', 'Legend_Awaiting Replacement'],
+                ['#6B7280', 'Blocked', 'Legend_Blocked'],
 
-            ].map(([hex, label, filterKey]) => (
-              <div
-                key={hex}
-                onClick={() => toggleFilter(filterKey)}
-                style={{ backgroundColor: hex, color: pickTextColor(hex) }}
-                className={cn(
-                  "flex items-center justify-center px-3 py-0.5 rounded-full border border-transparent cursor-pointer transition-all text-[10px] font-light uppercase tracking-wide shadow-sm hover:opacity-90",
-                  activeFilter === filterKey ? 'ring-2 ring-offset-1 ring-slate-400' : ''
-                )}
-              >
-                <span>{label}</span>
-              </div>
-            ))}
+              ].map(([hex, label, filterKey]) => (
+                <div
+                  key={hex}
+                  onClick={() => toggleFilter(filterKey)}
+                  style={{ backgroundColor: hex, color: pickTextColor(hex) }}
+                  className={cn(
+                    "flex items-center justify-center px-3 py-0.5 rounded-full border border-transparent cursor-pointer transition-all text-[10px] font-light uppercase tracking-wide shadow-sm hover:opacity-90",
+                    activeFilter === filterKey ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                  )}
+                >
+                  <span>{label}</span>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
       </div>
 
       <div className="ag-theme-alpine flex-1 w-full rounded-lg border border-slate-200 shadow-sm overflow-hidden bg-white">

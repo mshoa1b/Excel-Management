@@ -12,11 +12,14 @@ import { blockedByOptions, lockedOptions, oowOptions, yesNoOptions, returnTypeOp
 import { fetchBMOrder } from './api';
 import { computePlatform, buildReturnId } from '@/lib/sheetFormulas';
 import { format } from 'date-fns';
-import { Loader2, MessageSquare, History } from 'lucide-react';
+import { Loader2, MessageSquare, History, CalendarIcon } from 'lucide-react';
 import { AttachmentManager } from './AttachmentManager';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 interface SheetFormModalProps {
     open: boolean;
@@ -181,8 +184,8 @@ export function SheetFormModal({
                         refund_amount: Number(data.refund_amount ?? 0),
                         return_tracking_no: data.return_tracking_no,
                         platform: data.platform,
-                        order_date: data.order_date ? format(new Date(data.order_date), 'yyyy-MM-dd') : prev.order_date,
-                        date_received: data.date_received ? format(new Date(data.date_received), 'yyyy-MM-dd') : prev.date_received,
+                        order_date: data.order_date ? (data.order_date.includes('T') ? format(new Date(data.order_date), 'yyyy-MM-dd') : data.order_date) : prev.order_date,
+                        date_received: data.date_received ? (data.date_received.includes('T') ? format(new Date(data.date_received), 'yyyy-MM-dd') : data.date_received) : prev.date_received,
                     }));
                 }
             } catch (error) {
@@ -324,7 +327,13 @@ export function SheetFormModal({
                                                 <span className="font-medium text-slate-900">{formData.refund_amount || 0}</span>
 
                                                 <span className="text-slate-500">Refund Date:</span>
-                                                <span className="font-medium text-slate-900">{formData.refund_date ? format(new Date(formData.refund_date), 'dd-MM-yyyy') : '-'}</span>
+                                                <span className="font-medium text-slate-900">{formData.refund_date ? (() => {
+                                                    if (/^\d{4}-\d{2}-\d{2}$/.test(formData.refund_date)) {
+                                                        const [y, m, d] = formData.refund_date.split('-');
+                                                        return `${d}-${m}-${y}`;
+                                                    }
+                                                    try { return format(new Date(formData.refund_date), 'dd-MM-yyyy'); } catch { return formData.refund_date; }
+                                                })() : '-'}</span>
 
                                                 <span className="text-slate-500">Last Updated:</span>
                                                 <span className="font-medium text-slate-900">{formData.updated_at ? format(new Date(formData.updated_at), 'dd-MM-yyyy HH:mm') : '-'}</span>
@@ -335,31 +344,87 @@ export function SheetFormModal({
                             </div>
                             <div className="space-y-2">
                                 <Label>Date Received</Label>
-                                <Input
-                                    type="date"
-                                    value={formData.date_received}
-                                    onChange={e => handleChange('date_received', e.target.value)}
-                                    disabled={isFieldDisabled('date_received')}
-                                    className={getInputClassName('date_received')}
-                                />
+
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !formData.date_received && "text-muted-foreground",
+                                                getInputClassName('date_received')
+                                            )}
+                                            disabled={isFieldDisabled('date_received')}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {formData.date_received ? (
+                                                (() => {
+                                                    if (/^\d{4}-\d{2}-\d{2}$/.test(formData.date_received)) {
+                                                        const [y, m, d] = formData.date_received.split('-');
+                                                        return `${d}-${m}-${y}`;
+                                                    }
+                                                    try { return format(new Date(formData.date_received), 'dd-MM-yyyy'); } catch { return formData.date_received; }
+                                                })()
+                                            ) : (
+                                                <span>Pick a date</span>
+                                            )}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={formData.date_received ? new Date(formData.date_received) : undefined}
+                                            onSelect={(d) => handleChange('date_received', d ? format(d, 'yyyy-MM-dd') : '')}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
                             </div>
                             <div className="space-y-2">
                                 <Label>Order Date</Label>
-                                <Input
-                                    type="date"
-                                    value={formData.order_date}
-                                    onChange={e => handleChange('order_date', e.target.value)}
-                                    disabled={isFieldDisabled('order_date')}
-                                    className={getInputClassName('order_date')}
-                                />
+
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant={"outline"}
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !formData.order_date && "text-muted-foreground",
+                                                getInputClassName('order_date')
+                                            )}
+                                            disabled={isFieldDisabled('order_date')}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {formData.order_date ? (
+                                                (() => {
+                                                    if (/^\d{4}-\d{2}-\d{2}$/.test(formData.order_date)) {
+                                                        const [y, m, d] = formData.order_date.split('-');
+                                                        return `${d}-${m}-${y}`;
+                                                    }
+                                                    try { return format(new Date(formData.order_date), 'dd-MM-yyyy'); } catch { return formData.order_date; }
+                                                })()
+                                            ) : (
+                                                <span>Pick a date</span>
+                                            )}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0">
+                                        <Calendar
+                                            mode="single"
+                                            selected={formData.order_date ? new Date(formData.order_date) : undefined}
+                                            onSelect={(d) => handleChange('order_date', d ? format(d, 'yyyy-MM-dd') : '')}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
                             </div>
                             <div className="space-y-2">
                                 <Label>Platform</Label>
-                                <Input 
-                                    value={formData.platform} 
-                                    readOnly 
-                                    disabled={isFieldDisabled('platform')} 
-                                    className={getInputClassName('platform')} 
+                                <Input
+                                    value={formData.platform}
+                                    readOnly
+                                    disabled={isFieldDisabled('platform')}
+                                    className={getInputClassName('platform')}
                                 />
                             </div>
                             <div className="space-y-2">
