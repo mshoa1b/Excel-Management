@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { SheetRecord } from './SheetsGrid';
-import { blockedByOptions, lockedOptions, oowOptions, yesNoOptions, returnTypeOptions } from './constants';
+import { blockedByOptions, lockedOptions, oowOptions, yesNoOptions, returnTypeOptions, resolutionOptions } from './constants';
 import { fetchBMOrder } from './api';
 import { computePlatform, buildReturnId } from '@/lib/sheetFormulas';
 import { format } from 'date-fns';
@@ -596,11 +596,9 @@ export function SheetFormModal({
                                 <Select value={formData.resolution || 'Choose'} onValueChange={v => handleChange('resolution', v)} disabled={isFieldDisabled('resolution')}>
                                     <SelectTrigger className={getInputClassName('resolution')}><SelectValue placeholder="Choose" /></SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="Choose">Choose</SelectItem>
-                                        <SelectItem value="Refunded">Refunded</SelectItem>
-                                        <SelectItem value="Replaced">Replaced</SelectItem>
-                                        <SelectItem value="Denied">Denied</SelectItem>
-                                        <SelectItem value="Pending">Pending</SelectItem>
+                                        {resolutionOptions.map(opt => (
+                                            <SelectItem key={opt} value={opt}>{opt}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>

@@ -447,15 +447,25 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     const style = document.createElement('style');
     style.innerHTML = `
       .ag-theme-alpine .ag-row-hover {
-        background-color: inherit !important;
-        color: #ffffff !important;
-        filter: none !important;
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        transform: scale(1.005); /* Slight amplification */
+        z-index: 500 !important;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+        transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease !important;
+        border: 1px solid rgba(0,0,0,0.1) !important;
       }
       
-      /* Force all text/icons in hovered row to be white */
+      /* Force all text/icons in hovered row to be black */
       .ag-theme-alpine .ag-row-hover .ag-cell,
       .ag-theme-alpine .ag-row-hover .ag-cell * {
-        color: #ffffff !important;
+        color: #000000 !important;
+      }
+
+      /* Ensure sticky columns define background to avoid transparency issues during scale */
+      .ag-theme-alpine .ag-pinned-left-cols-container .ag-row-hover, 
+      .ag-theme-alpine .ag-pinned-right-cols-container .ag-row-hover {
+        background-color: #ffffff !important;
       }
 
       /* Also prevent cell hover overrides in some themes */
@@ -907,8 +917,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               </HoverCardTrigger>
               <HoverCardContent className="w-80 p-4 bg-white shadow-xl border-slate-200 z-[9999]" align="start">
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-sm text-slate-900 border-b pb-2">Quick Details</h4>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                  <h4 className="font-semibold text-[15px] text-slate-900 border-b pb-2">Quick Details</h4>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
                     <span className="text-slate-500">SKU:</span>
                     <span className="font-medium text-slate-900 truncate">{row.sku || '-'}</span>
 
@@ -1024,7 +1034,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                 <DropdownMenuContent align="end" className="w-48">
                   <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="p-2 cursor-default">
                     <div className="flex items-center justify-between w-full">
-                      <span className="text-sm font-medium">Attachments</span>
+                      <span className="text-[15px] font-medium">Attachments</span>
                       <AttachmentManager
                         sheetId={p.data?.id}
                         attachmentCount={attachmentCounts[p.data?.id] || 0}
@@ -1158,11 +1168,11 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               <div className="p-1 bg-blue-50 text-blue-600 rounded-md group-hover:bg-blue-100 transition-colors">
                 <Filter className="h-3.5 w-3.5" />
               </div>
-              <span className="text-xs font-semibold text-slate-700 uppercase tracking-wide">Control Panel & Statistics</span>
+              <span className="text-[13px] font-semibold text-slate-700 uppercase tracking-wide">Control Panel & Statistics</span>
             </div>
 
             {/* Marketplace Totals */}
-            <div className="hidden md:flex items-center gap-4 text-xs bg-slate-50 px-3 py-1.5 rounded border border-slate-100 shadow-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="hidden md:flex items-center gap-4 text-[13px] bg-slate-50 px-3 py-1.5 rounded border border-slate-100 shadow-sm" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-center gap-2">
                 <span className="text-slate-500 font-medium">Amazon:</span>
                 <span className="font-bold text-slate-900">{formatCurrency(totals.amazon)}</span>
@@ -1195,7 +1205,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                 <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-md border border-slate-100">
                   <div className="px-2 flex items-center gap-1.5 border-r border-slate-200">
                     <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                    <span className="text-[11px] font-medium text-slate-600">Date</span>
+                    <span className="text-xs font-medium text-slate-600">Date</span>
                   </div>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -1203,7 +1213,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                         variant={"ghost"}
                         size="sm"
                         className={cn(
-                          "h-7 text-[11px] justify-start text-left font-normal px-2 hover:bg-white",
+                          "h-7 text-xs justify-start text-left font-normal px-2 hover:bg-white",
                           !dateFrom && "text-muted-foreground"
                         )}
                       >
@@ -1220,14 +1230,14 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                     </PopoverContent>
                   </Popover>
 
-                  <span className="text-slate-300 text-[10px]">→</span>
+                  <span className="text-slate-300 text-[11px]">→</span>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
                         variant={"ghost"}
                         size="sm"
                         className={cn(
-                          "h-7 text-[11px] justify-start text-left font-normal px-2 hover:bg-white",
+                          "h-7 text-xs justify-start text-left font-normal px-2 hover:bg-white",
                           !dateTo && "text-muted-foreground"
                         )}
                       >
@@ -1252,9 +1262,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
                 {/* Platform Filter */}
                 <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-md border border-slate-100">
-                  <span className="text-[11px] font-medium text-slate-600 px-2 border-r border-slate-200">Platform</span>
+                  <span className="text-xs font-medium text-slate-600 px-2 border-r border-slate-200">Platform</span>
                   <Select value={platformFilter} onValueChange={setPlatformFilter}>
-                    <SelectTrigger className="w-28 h-7 text-[11px] border-0 bg-transparent focus:ring-0">
+                    <SelectTrigger className="w-28 h-7 text-xs border-0 bg-transparent focus:ring-0">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1272,24 +1282,24 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                     placeholder="Search..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8 w-48 h-8 text-xs bg-slate-50 border-slate-200 focus:bg-white transition-all"
+                    className="pl-8 w-48 h-8 text-[13px] bg-slate-50 border-slate-200 focus:bg-white transition-all"
                   />
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="flex items-center gap-1.5 w-full lg:w-auto justify-end">
-                <Button size="sm" className="h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white shadow-sm px-3" onClick={addRow}>
+                <Button size="sm" className="h-8 text-[13px] bg-slate-900 hover:bg-slate-800 text-white shadow-sm px-3" onClick={addRow}>
                   <Plus className="h-3.5 w-3.5 mr-1.5" /> New
                 </Button>
                 <div className="h-5 w-px bg-slate-200 mx-0.5" />
-                <Button variant="outline" size="sm" className="h-8 text-xs hover:bg-red-50 hover:text-red-600 hover:border-red-200 px-2" onClick={removeSelected}>
+                <Button variant="outline" size="sm" className="h-8 text-[13px] hover:bg-red-50 hover:text-red-600 hover:border-red-200 px-2" onClick={removeSelected}>
                   <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
                 </Button>
-                <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={handleHistoryClick}>
+                <Button variant="outline" size="sm" className="h-8 text-[13px] px-2" onClick={handleHistoryClick}>
                   <History className="h-3.5 w-3.5 mr-1" /> History
                 </Button>
-                <Button variant="outline" size="sm" className="h-8 text-xs px-2" onClick={refresh}>
+                <Button variant="outline" size="sm" className="h-8 text-[13px] px-2" onClick={refresh}>
                   <RotateCcw className="h-3.5 w-3.5 mr-1" /> Refresh
                 </Button>
                 <Button
@@ -1312,8 +1322,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                       activeFilter === 'Blocked' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
                     )}
                   >
-                    <span className="font-light text-[10px] uppercase tracking-wide">Blocked</span>
-                    <span className="text-sm font-bold">{statusStats.blocked}</span>
+                    <span className="font-light text-[11px] uppercase tracking-wide">Blocked</span>
+                    <span className="text-[15px] font-bold">{statusStats.blocked}</span>
                   </div>
 
                   <div
@@ -1323,8 +1333,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                       activeFilter === 'Actionable' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
                     )}
                   >
-                    <span className="font-light text-[10px] uppercase tracking-wide">Actionable</span>
-                    <span className="text-sm font-bold">{statusStats.actionable}</span>
+                    <span className="font-light text-[11px] uppercase tracking-wide">Actionable</span>
+                    <span className="text-[15px] font-bold">{statusStats.actionable}</span>
                   </div>
 
                   <div
@@ -1334,19 +1344,19 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                       activeFilter === 'Resolved' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
                     )}
                   >
-                    <span className="font-light text-[10px] uppercase tracking-wide">Resolved</span>
-                    <span className="text-sm font-bold">{statusStats.resolved}</span>
+                    <span className="font-light text-[11px] uppercase tracking-wide">Resolved</span>
+                    <span className="text-[15px] font-bold">{statusStats.resolved}</span>
                   </div>
 
                   <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-transparent shadow-sm bg-blue-500 text-white">
-                    <span className="font-light text-[10px] uppercase tracking-wide">Total</span>
-                    <span className="text-sm font-bold">{statusStats.total}</span>
+                    <span className="font-light text-[11px] uppercase tracking-wide">Total</span>
+                    <span className="text-[15px] font-bold">{statusStats.total}</span>
                   </div>
 
                   {statusStats.total > 0 && (
                     <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-transparent shadow-sm bg-slate-400 text-white">
-                      <span className="font-light text-[10px] uppercase tracking-wide">Progress</span>
-                      <span className="text-sm font-bold">
+                      <span className="font-light text-[11px] uppercase tracking-wide">Progress</span>
+                      <span className="text-[15px] font-bold">
                         {Math.round((statusStats.resolved / statusStats.total) * 100)}%
                       </span>
                     </div>
@@ -1359,8 +1369,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                       activeFilter === 'Overdue' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
                     )}
                   >
-                    <span className="font-light text-[10px] uppercase tracking-wide">14+ Days</span>
-                    <span className="text-sm font-bold">{statusStats.overdue}</span>
+                    <span className="font-light text-[11px] uppercase tracking-wide">14+ Days</span>
+                    <span className="text-[15px] font-bold">{statusStats.overdue}</span>
                   </div>
                 </div>
 
@@ -1369,7 +1379,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                     <div
                       onClick={() => toggleFilter('Overdue')}
                       className={cn(
-                        "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
+                        "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-[13px] font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
                         activeFilter === 'Overdue' ? 'ring-2 ring-red-200 bg-red-100' : ''
                       )}
                     >
@@ -1382,7 +1392,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                     <div
                       onClick={() => toggleFilter('ReplacementPending')}
                       className={cn(
-                        "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
+                        "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-[13px] font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
                         activeFilter === 'ReplacementPending' ? 'ring-2 ring-red-200 bg-red-100' : ''
                       )}
                     >
@@ -1395,7 +1405,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                     <div
                       onClick={() => toggleFilter('ResolutionPending')}
                       className={cn(
-                        "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-xs font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
+                        "px-3 py-1.5 bg-red-50 border border-red-100 rounded-md text-red-700 text-[13px] font-medium flex items-center gap-2 animate-pulse cursor-pointer hover:bg-red-100 transition-colors",
                         activeFilter === 'ResolutionPending' ? 'ring-2 ring-red-200 bg-red-100' : ''
                       )}
                     >
@@ -1423,7 +1433,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                   onClick={() => toggleFilter(filterKey)}
                   style={{ backgroundColor: hex, color: pickTextColor(hex) }}
                   className={cn(
-                    "flex items-center justify-center px-3 py-0.5 rounded-full border border-transparent cursor-pointer transition-all text-[10px] font-light uppercase tracking-wide shadow-sm hover:opacity-90",
+                    "flex items-center justify-center px-3 py-0.5 rounded-full border border-transparent cursor-pointer transition-all text-[11px] font-light uppercase tracking-wide shadow-sm hover:opacity-90",
                     activeFilter === filterKey ? 'ring-2 ring-offset-1 ring-slate-400' : ''
                   )}
                 >
@@ -1459,8 +1469,8 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
             minWidth: 40,
             wrapText: true,
             autoHeight: true,
-            cellClass: 'px-2 py-1 border-r border-slate-100 flex items-center justify-center text-center break-words leading-tight text-xs',
-            headerClass: 'bg-slate-900 text-slate-400 font-semibold text-xs uppercase tracking-wider',
+            cellClass: 'px-2 py-1 border-r border-slate-100 flex items-center justify-center text-center break-words leading-tight text-[13px]',
+            headerClass: 'bg-slate-900 text-slate-400 font-semibold text-[13px] uppercase tracking-wider',
           }}
           getRowId={p => String(p.data?.id ?? Math.random())}
           getRowClass={() => 'group hover:bg-slate-50/50 transition-colors'}

@@ -12,3 +12,6 @@ export const MULTILINE_COLS = ['customer_comment', 'additional_notes', 'cs_comme
 
 export const yesNoOptions = ['Choose', 'Yes', 'No'];
 export const returnTypeOptions = ['Choose', 'Refund', 'Replacement', 'Repair'];
+
+export const resolutionOptions = ['Choose', 'Back in stock',
+    'Sent back to supplier', 'Sent repaired back to customer', 'Sent un-repaired back to customer', 'BER'];
