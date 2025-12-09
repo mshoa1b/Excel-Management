@@ -449,11 +449,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       .ag-theme-alpine .ag-row-hover {
         background-color: #ffffff !important;
         color: #000000 !important;
-        transform: scale(1.005); /* Slight amplification */
-        z-index: 20 !important;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-        transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease !important;
-        border: 1px solid rgba(0,0,0,0.1) !important;
+        /* Amplification removed */
       }
       
       /* Force all text/icons in hovered row to be black */
@@ -915,10 +911,13 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                   {params.value}
                 </span>
               </HoverCardTrigger>
-              <HoverCardContent className="w-80 p-4 bg-white shadow-xl border-slate-200 z-[9999]" align="start">
+              <HoverCardContent className="w-96 p-4 bg-white shadow-xl border-slate-200 z-[9999]" align="start">
                 <div className="space-y-3">
                   <h4 className="font-semibold text-[15px] text-slate-900 border-b pb-2">Quick Details</h4>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                    <span className="text-slate-500">Order Number:</span>
+                    <span className="font-medium text-slate-900 truncate">{row.order_no || '-'}</span>
+
                     <span className="text-slate-500">SKU:</span>
                     <span className="font-medium text-slate-900 truncate">{row.sku || '-'}</span>
 
