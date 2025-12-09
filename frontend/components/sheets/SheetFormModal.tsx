@@ -292,10 +292,13 @@ export function SheetFormModal({
                                             placeholder="Order No"
                                         />
                                     </HoverCardTrigger>
-                                    <HoverCardContent className="w-80 p-4 bg-white shadow-xl border-slate-200" align="start">
+                                    <HoverCardContent className="w-96 p-4 bg-white shadow-xl border-slate-200" align="start">
                                         <div className="space-y-3">
                                             <h4 className="font-semibold text-sm text-slate-900 border-b pb-2">Quick Details</h4>
                                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                                <span className="text-slate-500">Order Number:</span>
+                                                <span className="font-medium text-slate-900 truncate">{formData.order_no || '-'}</span>
+
                                                 <span className="text-slate-500">SKU:</span>
                                                 <span className="font-medium text-slate-900 truncate">{formData.sku || '-'}</span>
 
