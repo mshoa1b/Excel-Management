@@ -47,6 +47,7 @@ export function SheetFormModal({
     const [loading, setLoading] = useState(false);
     const [fetchingBM, setFetchingBM] = useState(false);
     const [attachmentCount, setAttachmentCount] = useState(0);
+    const [orderNoChanged, setOrderNoChanged] = useState(false);
 
     useEffect(() => {
         if (initialData?.id && open) {
@@ -62,6 +63,7 @@ export function SheetFormModal({
         if (open) {
             if (initialData) {
                 setFormData({ ...initialData });
+                setOrderNoChanged(false);
             } else {
                 // Default values for new row
                 const today = format(new Date(), 'yyyy-MM-dd');
@@ -150,6 +152,10 @@ export function SheetFormModal({
         setFormData(prev => {
             const next = { ...prev, [field]: value };
 
+            if (field === 'order_no') {
+                setOrderNoChanged(true);
+            }
+
             // Auto-calculate platform
             if (field === 'order_no') {
                 next.platform = computePlatform(value || '');
@@ -195,12 +201,17 @@ export function SheetFormModal({
             }
         };
 
-        // Only trigger if typing created an 8-char string and we are in create mode or order_no changed significantly
+        // Only trigger if typing created an 8-char string
         // To avoid spamming, we check logic inside effect
+        // ALSO: Do not fetch if we are in Edit mode and the order number matches initialData (prevent overwrite on open)
         if (formData.order_no?.length === 8) {
+            // Robust check: In edit mode, only fetch if the user explicitly changed the order number
+            if (isEdit && !orderNoChanged) {
+                return;
+            }
             fetchBM();
         }
-    }, [formData.order_no]);
+    }, [formData.order_no, isEdit, orderNoChanged]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
