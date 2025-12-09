@@ -929,7 +929,12 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               </HoverCardTrigger>
               <HoverCardContent className="w-96 p-4 bg-white shadow-xl border-slate-200 z-[9999]" align="start">
                 <div className="space-y-3">
-                  <h4 className="font-semibold text-[15px] text-slate-900 border-b pb-2">Quick Details</h4>
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <h4 className="font-semibold text-[15px] text-slate-900">Quick Details</h4>
+                    <span className="text-[11px] text-slate-400">
+                      Updated: {row.updated_at ? format(new Date(row.updated_at), 'dd-MM-yyyy HH:mm') : '-'}
+                    </span>
+                  </div>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
                     <span className="text-slate-500">Order Number:</span>
                     <div className="flex items-center gap-2 min-w-0">
@@ -958,9 +963,6 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                     <span className="text-slate-500">Customer Comment:</span>
                     <span className="font-medium text-slate-900 whitespace-pre-wrap break-words" title={row.customer_comment}>{row.customer_comment || '-'}</span>
 
-                    <span className="text-slate-500">Multiple Return:</span>
-                    <span className="font-medium text-slate-900">{row.multiple_return || '-'}</span>
-
                     <span className="text-slate-500">Return Type:</span>
                     <span className="font-medium text-slate-900">{row.return_type || '-'}</span>
 
@@ -979,14 +981,12 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                     <span className="text-slate-500">Return Tracking:</span>
                     <span className="font-medium text-slate-900 truncate">{row.return_tracking_no || '-'}</span>
 
-                    <span className="text-slate-500">Refund Amount:</span>
-                    <span className="font-medium text-slate-900">{typeof row.refund_amount === 'number' ? formatCurrency(row.refund_amount) : formatCurrency(0)}</span>
-
-                    <span className="text-slate-500">Refund Date:</span>
-                    <span className="font-medium text-slate-900">{row.refund_date ? toYMD(row.refund_date).split('-').reverse().join('-') : '-'}</span>
-
-                    <span className="text-slate-500">Last Updated:</span>
-                    <span className="font-medium text-slate-900">{row.updated_at ? format(new Date(row.updated_at), 'dd-MM-yyyy HH:mm') : '-'}</span>
+                    <span className="text-slate-500">Refund:</span>
+                    <span className="font-medium text-slate-900">
+                      {typeof row.refund_amount === 'number' ? formatCurrency(row.refund_amount) : formatCurrency(0)}
+                      {' - '}
+                      {row.refund_date ? toYMD(row.refund_date).split('-').reverse().join('-') : '-'}
+                    </span>
                   </div>
                 </div>
               </HoverCardContent>

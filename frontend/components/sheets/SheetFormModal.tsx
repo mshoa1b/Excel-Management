@@ -305,7 +305,12 @@ export function SheetFormModal({
                                     </HoverCardTrigger>
                                     <HoverCardContent className="w-96 p-4 bg-white shadow-xl border-slate-200" align="start">
                                         <div className="space-y-3">
-                                            <h4 className="font-semibold text-sm text-slate-900 border-b pb-2">Quick Details</h4>
+                                            <div className="flex items-center justify-between border-b pb-2">
+                                                <h4 className="font-semibold text-sm text-slate-900">Quick Details</h4>
+                                                <span className="text-[10px] text-slate-400">
+                                                    Updated: {formData.updated_at ? format(new Date(formData.updated_at), 'dd-MM-yyyy HH:mm') : '-'}
+                                                </span>
+                                            </div>
                                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                                                 <span className="text-slate-500">Order Number:</span>
                                                 <div className="flex items-center gap-2 min-w-0">
@@ -335,9 +340,6 @@ export function SheetFormModal({
                                                 <span className="text-slate-500">Customer Comment:</span>
                                                 <span className="font-medium text-slate-900 whitespace-pre-wrap break-words" title={formData.customer_comment}>{formData.customer_comment || '-'}</span>
 
-                                                <span className="text-slate-500">Multiple Return:</span>
-                                                <span className="font-medium text-slate-900">{formData.multiple_return || '-'}</span>
-
                                                 <span className="text-slate-500">Return Type:</span>
                                                 <span className="font-medium text-slate-900">{formData.return_type || '-'}</span>
 
@@ -356,20 +358,18 @@ export function SheetFormModal({
                                                 <span className="text-slate-500">Return Tracking:</span>
                                                 <span className="font-medium text-slate-900 truncate">{formData.return_tracking_no || '-'}</span>
 
-                                                <span className="text-slate-500">Refund Amount:</span>
-                                                <span className="font-medium text-slate-900">{formData.refund_amount || 0}</span>
-
-                                                <span className="text-slate-500">Refund Date:</span>
-                                                <span className="font-medium text-slate-900">{formData.refund_date ? (() => {
-                                                    if (/^\d{4}-\d{2}-\d{2}$/.test(formData.refund_date)) {
-                                                        const [y, m, d] = formData.refund_date.split('-');
-                                                        return `${d}-${m}-${y}`;
-                                                    }
-                                                    try { return format(new Date(formData.refund_date), 'dd-MM-yyyy'); } catch { return formData.refund_date; }
-                                                })() : '-'}</span>
-
-                                                <span className="text-slate-500">Last Updated:</span>
-                                                <span className="font-medium text-slate-900">{formData.updated_at ? format(new Date(formData.updated_at), 'dd-MM-yyyy HH:mm') : '-'}</span>
+                                                <span className="text-slate-500">Refund:</span>
+                                                <span className="font-medium text-slate-900">
+                                                    {formData.refund_amount || 0}
+                                                    {' - '}
+                                                    {formData.refund_date ? (() => {
+                                                        if (/^\d{4}-\d{2}-\d{2}$/.test(formData.refund_date)) {
+                                                            const [y, m, d] = formData.refund_date.split('-');
+                                                            return `${d}-${m}-${y}`;
+                                                        }
+                                                        try { return format(new Date(formData.refund_date), 'dd-MM-yyyy'); } catch { return formData.refund_date; }
+                                                    })() : '-'}
+                                                </span>
                                             </div>
                                         </div>
                                     </HoverCardContent>
