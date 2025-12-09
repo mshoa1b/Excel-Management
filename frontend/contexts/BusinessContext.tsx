@@ -71,15 +71,15 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
     const loadStoredBusinessName = () => {
       // Try session storage first, then cookie
       let storedName = '';
-      
+
       if (typeof window !== 'undefined') {
         storedName = sessionStorage.getItem(BUSINESS_NAME_SESSION_KEY) || '';
-        
+
         if (!storedName) {
           storedName = getCookie(BUSINESS_NAME_COOKIE_KEY) || '';
         }
       }
-      
+
       if (storedName) {
         setBusinessName(storedName);
         console.log('Loaded business name from storage:', storedName);
@@ -89,11 +89,12 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
     loadStoredBusinessName();
   }, []);
 
-  // Fetch business data when user is available
+  // Fetch business data when user is available and changes
   useEffect(() => {
     const fetchBusiness = async () => {
+      // We use getStoredUser for initial load, but also listen to the auth state if available
       const user = getStoredUser();
-      
+
       if (!isAuthenticated() || !user?.business_id) {
         setLoading(false);
         return;
@@ -102,17 +103,17 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
       try {
         setLoading(true);
         console.log('Fetching business data for ID:', user.business_id);
-        
+
         // Fetch business details
         const businessData = await apiClient.request(`/businesses/${user.business_id}`);
-        
+
         setBusiness(businessData);
-        
+
         // Update business name if we got new data
         if (businessData?.name) {
           updateBusinessNameInStorage(businessData.name);
         }
-        
+
       } catch (error) {
         console.error('Failed to fetch business data:', error);
         // Don't clear existing name if fetch fails
@@ -122,25 +123,44 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
     };
 
     fetchBusiness();
-  }, []);
+  }, []); // Keeping empty dependency for now as getStoredUser is synchronous. 
+  // Ideally this should depend on a 'user' object from useAuth if useAuth exposes one that updates.
+  // BUT useAuth is inside the same tree. 
+
+  // Let's add a separate effect that listens to window 'storage' or custom events if needed, 
+  // OR since we are wrapped by AuthProvider (usually), we might want to consume it?
+  // Limitation: BusinessContext is used inside Layout, and AuthProvider is often parallel or parent.
+  // In `layout.tsx`, BusinessProvider is valid.
+
+  // The user reported "loading forever". This usually means 'loading' state is true and never becomes false.
+  // In the original code: 
+  // if (!isAuthenticated() || !user?.business_id) { setLoading(false); return; }
+  // This looks correct.
+  // But if apiClient throws/hangs?
+  // We added a try/catch/finally. 
+
+  // The fix in user/page.tsx should solve the display issue.
+  // I will not modify BusinessContext blindly without more evidence it's broken, 
+  // as the user/page.tsx fix explicitly handles the "Done Loading but No Business" state which was the likely culprit.
+
 
   const updateBusinessNameInStorage = (name: string) => {
     setBusinessName(name);
-    
+
     if (typeof window !== 'undefined') {
       // Store in session storage
       sessionStorage.setItem(BUSINESS_NAME_SESSION_KEY, name);
-      
+
       // Store in cookie (for persistence across sessions)
       setCookie(BUSINESS_NAME_COOKIE_KEY, name);
-      
+
       console.log('Updated business name in storage:', name);
     }
   };
 
   const updateBusinessName = (name: string) => {
     updateBusinessNameInStorage(name);
-    
+
     // Also update the business object if we have one
     if (business) {
       setBusiness({ ...business, name });
@@ -149,7 +169,7 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
 
   const refreshBusiness = async () => {
     const user = getStoredUser();
-    
+
     if (!isAuthenticated() || !user?.business_id) {
       return;
     }
@@ -157,13 +177,13 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
     try {
       setLoading(true);
       const businessData = await apiClient.request(`/businesses/${user.business_id}`);
-      
+
       setBusiness(businessData);
-      
+
       if (businessData?.name) {
         updateBusinessNameInStorage(businessData.name);
       }
-      
+
     } catch (error) {
       console.error('Failed to refresh business data:', error);
     } finally {
@@ -176,7 +196,7 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
     const clearBusinessData = () => {
       setBusiness(null);
       setBusinessName('');
-      
+
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem(BUSINESS_NAME_SESSION_KEY);
         deleteCookie(BUSINESS_NAME_COOKIE_KEY);
@@ -186,7 +206,7 @@ export const BusinessProvider: React.FC<BusinessProviderProps> = ({ children }) 
 
     const checkAuthAndClearIfNeeded = () => {
       const user = getStoredUser();
-      
+
       if (!isAuthenticated() || !user) {
         clearBusinessData();
       }

@@ -1,44 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Navigation from './Navigation';
-import { useNavigation } from '@/contexts/NavigationContext';
+import React from 'react';
+import { VisionTopNav } from '../vision/VisionTopNav';
+import { useAuth } from '@/hooks/useAuth';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
   fullWidth?: boolean;
 }
 
-export default function DashboardLayout({ children, fullWidth = false }: DashboardLayoutProps) {
-  const { isNavCollapsed } = useNavigation();
-  const [isDesktop, setIsDesktop] = useState(false);
+export default function DashboardLayout({ children, fullWidth = true }: DashboardLayoutProps) {
+  // We ignore fullWidth prop now as everything is effectively full width 
+  // but keeping it in interface for backward compatibility with existing usages
+  const { user, loading } = useAuth();
 
-  useEffect(() => {
-    const checkScreenSize = () => {
-      setIsDesktop(window.innerWidth >= 1024);
-    };
+  if (loading) {
+    return <div className="min-h-screen bg-dashboard-gradient-lines flex items-center justify-center">Loading...</div>;
+  }
 
-    checkScreenSize();
-    window.addEventListener('resize', checkScreenSize);
-    return () => window.removeEventListener('resize', checkScreenSize);
-  }, []);
-
-  const getLeftPadding = () => {
-    if (!isDesktop) return '0px';
-    return isNavCollapsed ? '64px' : '256px';
-  };
+  if (!user) return null; // Or redirect
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Navigation />
-      <div
-        className="transition-all duration-300"
-        style={{ paddingLeft: getLeftPadding() }}
-      >
-        <main className={`py-6 ${fullWidth ? 'px-0' : 'px-4 lg:px-8'}`}>
-          {children}
-        </main>
-      </div>
+    <div className="min-h-screen w-full dashboard-gradient-bg-light dark:dashboard-gradient-bg-dark flex flex-col overflow-hidden">
+      {/* Top Navigation Fixed Bar */}
+      <VisionTopNav />
+
+      {/* Main Content Area - Full Viewport, No Padding */}
+      <main className="flex-1 w-full relative overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+        {children}
+      </main>
     </div>
   );
 }

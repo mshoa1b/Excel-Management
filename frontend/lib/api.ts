@@ -180,6 +180,24 @@ class ApiClient {
     return this.request(`/sheets/${businessId}`, { method: "DELETE", body: JSON.stringify({ id: sheetId }) });
   }
 
+  // -------- Enquiries --------
+  async getEnquiries(params: any = {}) {
+    // Build query string manually or use URLSearchParams
+    const parts = [];
+    if (params.page) parts.push(`page=${params.page}`);
+    if (params.limit) parts.push(`limit=${params.limit}`);
+    if (params.status_filter) parts.push(`status_filter=${params.status_filter}`);
+    const qs = parts.length ? `?${parts.join('&')}` : '';
+    return this.request(`/enquiries${qs}`);
+  }
+
+  async createEnquiry(data: any) {
+    return this.request('/enquiries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   // -------- Stats --------
   getStats(businessId: number | string, range: "1d" | "1w" | "1m" | "3m" | "6m" | "1y" | string = "1m") {
     return this.request(`/stats/${businessId}`, { method: "POST", body: JSON.stringify({ range }) });

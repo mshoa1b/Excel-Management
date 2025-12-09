@@ -1,176 +1,244 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import ProtectedRoute from '@/components/auth/ProtectedRoute';
-import DashboardLayout from '@/components/layout/DashboardLayout';
-import StatsCard from '@/components/dashboard/StatsCard';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useCurrency } from '@/hooks/useCurrency';
+import { useBusiness } from '@/contexts/BusinessContext';
+import DashboardLayout from '@/components/layout/DashboardLayout';
+import ProtectedRoute from '@/components/auth/ProtectedRoute';
+import { VisionSectionHeader } from '@/components/vision/VisionSectionHeader';
+import { VisionKpiOrbit } from '@/components/vision/VisionKpiOrbit';
+import { VisionRadarCard } from '@/components/vision/VisionRadarCard';
+import { VisionInsightCanvas } from '@/components/vision/VisionInsightCanvas';
 import { apiClient } from '@/lib/api';
-import type { Stats, Sheet } from '@/types';
-import { FileSpreadsheet, DollarSign, TrendingUp, ArrowRight } from 'lucide-react';
+import { AdvancedStats, Stats } from '@/types';
+import { Loader2, Activity, CheckCircle, Clock, ShieldAlert, MessageSquare, Package, FileSpreadsheet, ArrowRight } from 'lucide-react';
+import { ResponsiveContainer, AreaChart, Area, XAxis, Tooltip } from 'recharts';
+import { useRouter } from 'next/navigation';
 
 export default function UserDashboard() {
   const { user, loading: authLoading } = useAuth();
-  const { formatCurrency } = useCurrency(user?.business_id || '');
+  const { business, loading: businessLoading } = useBusiness();
   const [stats, setStats] = useState<Stats | null>(null);
-  const [dataLoading, setDataLoading] = useState(true);
-  const [error, setError] = useState<string>("");
-
-  const bizId = useMemo(
-    () => (user?.business_id != null ? String(user.business_id) : null),
-    [user?.business_id]
-  );
+  const [advancedStats, setAdvancedStats] = useState<AdvancedStats | null>(null);
+  const [enquiryStats, setEnquiryStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!bizId) {
-      setDataLoading(false);
-      return;
-    }
+    const loadDashboardData = async () => {
+      if (business?.id && user?.username) {
+        setLoading(true);
+        try {
+          // Fetch Basic Stats (for pending/in-progress counts)
+          const basic = await apiClient.getStats(business.id, '1y');
+          setStats(basic);
 
-    let cancelled = false;
-    (async () => {
-      setDataLoading(true);
-      setError("");
-      try {
-        const statsData = await apiClient.getStats(bizId, '1m');
-        if (cancelled) return;
-        setStats(statsData);
-      } catch (e) {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : 'Failed to load dashboard data');
-      } finally {
-        if (!cancelled) setDataLoading(false);
+          // Fetch Advanced Stats (for status breakdown and lock analysis)
+          const advanced = await apiClient.getAdvancedStats(business.id, '1y');
+          setAdvancedStats(advanced);
+
+          // Fetch Enquiry Stats
+          try {
+            const enquiriesData = await apiClient.getEnquiries({ limit: 1 });
+            setEnquiryStats(enquiriesData.stats || {});
+          } catch (err) {
+            console.error("Enquiry fetch failed", err);
+          }
+
+        } catch (error) {
+          console.error("Failed to fetch dashboard data", error);
+        } finally {
+          setLoading(false);
+        }
+      } else if (!businessLoading && !business) {
+        setLoading(false);
       }
-    })();
+    };
 
-    return () => { cancelled = true; };
-  }, [authLoading, bizId]);
+    if (!businessLoading) {
+      loadDashboardData();
+    }
+  }, [business, user, businessLoading]);
 
-  // Show a nice loader while either auth or data is loading
-  if (authLoading || dataLoading) {
+  if (authLoading || businessLoading) {
     return (
-      <ProtectedRoute requiredRole="User">
-        <DashboardLayout>
-          <div className="flex items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
-          </div>
-        </DashboardLayout>
-      </ProtectedRoute>
+      <DashboardLayout>
+        <div className="flex h-screen items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        </div>
+      </DashboardLayout>
     );
+  }
+
+  if (!user || !business) {
+    return (
+      <DashboardLayout>
+        <div className="min-h-screen flex items-center justify-center flex-col gap-4">
+          <div className="p-4 rounded-full bg-red-50 text-red-500">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+          <h3 className="text-lg font-bold text-slate-800">Account Not Configured</h3>
+          <p className="text-slate-500 max-w-md text-center">
+            Your account is not associated with a valid business entity.
+          </p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // --- LOGIC ---
+  const isCsUser = user.username.toLowerCase().startsWith('cs');
+
+  // Metrics Calculation
+  const unresolvedOrders = (stats?.pendingOrders || 0) + (stats?.inProgressOrders || 0);
+
+  // Helper to find status count from AdvancedStats
+  const getStatusCount = (statusName: string) => {
+    return advancedStats?.statusBreakdown?.find(s => s.status === statusName)?.count || 0;
+  };
+
+  // KPI DATA
+  let kpi1 = { label: '', value: 0, sub: '', icon: <Activity className="w-4 h-4 text-orange-500" /> };
+  let kpi2 = { label: '', value: 0, sub: '', icon: <CheckCircle className="w-4 h-4 text-blue-500" /> };
+  let kpi3 = { label: '', value: 0, sub: '', icon: <MessageSquare className="w-4 h-4 text-purple-500" /> };
+
+  if (isCsUser) {
+    // CS USER VIEW
+    kpi1 = {
+      label: 'Awaiting Techezm',
+      value: getStatusCount('Awaiting Techezm'),
+      sub: 'Orders Actionable',
+      icon: <Clock className="w-4 h-4 text-blue-500" />
+    };
+
+    const pinCount = advancedStats?.lockAnalysis?.passcode_count || 0;
+    const appleIdCount = advancedStats?.lockAnalysis?.apple_id_count || 0;
+
+    kpi2 = {
+      label: 'PIN / Apple ID',
+      value: pinCount + appleIdCount,
+      sub: 'Locked Devices',
+      icon: <ShieldAlert className="w-4 h-4 text-red-500" />
+    };
+
+    kpi3 = {
+      label: 'Enquiries Pending',
+      value: enquiryStats?.awaitingTechezm || 0,
+      sub: 'Awaiting Response',
+      icon: <MessageSquare className="w-4 h-4 text-purple-500" />
+    };
+
+  } else {
+    // BUSINESS/REGULAR USER VIEW
+    kpi1 = {
+      label: 'Awaiting G&I',
+      value: getStatusCount('Awaiting G&I'),
+      sub: 'Processing',
+      icon: <Loader2 className="w-4 h-4 text-indigo-500" />
+    };
+
+    kpi2 = {
+      label: 'Awaiting Replacement',
+      value: getStatusCount('Awaiting Replacement'),
+      sub: 'Replacement Queue',
+      icon: <Package className="w-4 h-4 text-blue-500" />
+    };
+
+    kpi3 = {
+      label: 'Enquiries Pending',
+      value: enquiryStats?.awaitingBusiness || 0,
+      sub: 'Action Required',
+      icon: <MessageSquare className="w-4 h-4 text-orange-500" />
+    };
   }
 
   return (
     <ProtectedRoute requiredRole="User">
       <DashboardLayout>
-        <div className="space-y-8">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">
-              {user?.business?.name ? `${user.business.name} Dashboard` : 'User Dashboard'}
-            </h1>
-            <p className="text-slate-600">View your business operations and analytics</p>
+        <div className="w-full flex flex-col gap-6">
+          <VisionSectionHeader
+            title={`Welcome, ${user.username}`}
+            description="Your operational dashboard"
+          />
+
+          {/* MAIN KPI ROW */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            {/* Common Metric: Total Unresolved */}
+            <VisionKpiOrbit
+              label="Unresolved Orders"
+              value={unresolvedOrders.toString()}
+              subValue="Total Active Pipeline"
+              icon={<Activity className="w-4 h-4 text-slate-500" />}
+            />
+
+            {/* Dynamic Metrics */}
+            <VisionKpiOrbit
+              label={kpi1.label}
+              value={kpi1.value.toString()}
+              subValue={kpi1.sub}
+              icon={kpi1.icon}
+            />
+
+            <VisionKpiOrbit
+              label={kpi2.label}
+              value={kpi2.value.toString()}
+              subValue={kpi2.sub}
+              icon={kpi2.icon}
+            />
+
+            <VisionKpiOrbit
+              label={kpi3.label}
+              value={kpi3.value.toString()}
+              subValue={kpi3.sub}
+              icon={kpi3.icon}
+            />
           </div>
 
-          {/* Error banner */}
-          {error && (
-            <div className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-red-700">
-              {error}
-            </div>
-          )}
+          {/* ACTION AREA */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div
+              onClick={() => router.push(`/sheets/${business.id}`)}
+              className="group relative overflow-hidden rounded-3xl cursor-pointer transition-all duration-300 hover:shadow-2xl hover:-translate-y-1"
+            >
+              {/* Clean Glass Background */}
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-indigo-700 opacity-90" />
+              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
 
-          {/* Stats Cards */}
-          {stats && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <StatsCard
-                title="Total Orders"
-                value={stats.totalOrders ?? 0}
-                description="This period"
-                icon={FileSpreadsheet}
-              />
-              <StatsCard
-                title="Total Refund Amount"
-                value={formatCurrency(stats.totalRefundAmount ?? 0)}
-                description="This period"
-                icon={DollarSign}
-              />
-              <StatsCard
-                title="Unique Orders"
-                value={stats.uniqueOrders ?? 0}
-                description="Distinct order numbers"
-                icon={TrendingUp}
-              />
-              <StatsCard
-                title="Average Refund"
-                value={
-                  stats.uniqueOrders > 0
-                    ? formatCurrency((stats.totalRefundAmount ?? 0) / stats.uniqueOrders)
-                    : formatCurrency(0)
-                }
-                description="Per order"
-                icon={DollarSign}
-              />
-            </div>
-          )}
-
-          {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <Card className="hover:shadow-lg transition-shadow duration-300">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2">
-                  <FileSpreadsheet className="h-5 w-5 text-blue-600" />
-                  Manage Returns
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-slate-600 text-sm">
-                  Access and manage returns, view order details, and process refunds.
-                </p>
-                <div className="flex justify-between items-center">
-                  <Link href={`/sheets/${bizId}`}>
-                    <Button className="group">
-                      View Returns
-                      <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                    </Button>
-                  </Link>
+              {/* Content */}
+              <div className="relative p-8 h-48 flex flex-col justify-between">
+                <div className="flex justify-between items-start">
+                  <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                    <FileSpreadsheet className="w-8 h-8 text-white" />
+                  </div>
+                  <span className="text-white/60 text-sm font-semibold tracking-wider uppercase">Quick Access</span>
                 </div>
-              </CardContent>
-            </Card>
+
+                <div>
+                  <h3 className="text-2xl font-bold text-white mb-1 group-hover:translate-x-1 transition-transform">Manage Returns Sheet</h3>
+                  <div className="flex items-center gap-2 text-blue-100/80 text-sm font-medium">
+                    <span>Access full database</span>
+                    <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Secondary Global Stats (Optional Context) */}
+            <div className="bg-white/50 dark:bg-slate-900/50 rounded-3xl p-6 border border-white/10 backdrop-blur-md flex flex-col justify-center gap-4">
+              <h4 className="text-sm font-bold text-slate-500 uppercase tracking-widest">Platform Status</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-4 rounded-2xl bg-white/40 dark:bg-slate-800/40">
+                  <div className="text-xs text-slate-500 mb-1">Total Processed</div>
+                  <div className="text-xl font-bold text-slate-800 dark:text-slate-200">{stats?.totalOrders || 0}</div>
+                </div>
+                <div className="p-4 rounded-2xl bg-white/40 dark:bg-slate-800/40">
+                  <div className="text-xs text-slate-500 mb-1">Total Refunded</div>
+                  <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400">${stats?.totalRefundAmount?.toLocaleString() || 0}</div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Business Information */}
-          {user?.business && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Business Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Business Name</p>
-                    <p className="text-slate-600">{user.business.name}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Business ID</p>
-                    <p className="text-slate-600">{user.business.id}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Currency</p>
-                    <p className="text-slate-600">
-                      {user.business.currency_symbol} ({user.business.currency_code})
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-700">Your Role</p>
-                    <p className="text-slate-600">{user.role?.name}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </div>
       </DashboardLayout>
     </ProtectedRoute>

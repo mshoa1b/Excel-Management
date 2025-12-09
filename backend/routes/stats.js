@@ -417,202 +417,171 @@ router.post("/:businessId/advanced", authenticateToken, assertBusinessScope, asy
     const { range } = req.body || {};
     const startDate = getDateRange(range);
 
-    // Execute all queries in parallel for performance
-    const [
-      resolutionRows,
-      return30DaysRows,
-      blockedByRows,
-      returnTypeRows,
-      replacementAnalysisRows,
-      returnTypeResolutionRows,
-      returnType30DaysRows,
-      return30DaysResolutionRows,
-      multipleReturnResolutionRows,
-      platformReturnResolutionRows,
-      issueResolutionRows,
-      statusReturnTypeRows,
-      oowResolutionRows,
-      doneByReturnTypeRows,
-      appleGoogleResolutionRows
-    ] = await Promise.all([
-      // 1. Resolution Breakdown
-      pool.query(
-        `SELECT resolution, COUNT(*)::int AS count,
-         ROUND((COUNT(*) * 100.0 / SUM(COUNT(*)) OVER ()), 2)::float AS percentage,
-         COALESCE(AVG(refund_amount), 0)::float AS avg_refund
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-           AND resolution IS NOT NULL AND resolution != 'Choose' AND resolution != ''
-         GROUP BY resolution ORDER BY count DESC`,
-        [businessId, startDate]
+    // Optimized query using CTEs for single-pass aggregation
+    const { rows } = await pool.query(
+      `
+      WITH filtered_sheets AS (
+        SELECT * FROM sheets 
+        WHERE business_id = $1 AND date_received >= $2
       ),
-
-      // 2. Return within 30 Days Analysis
-      pool.query(
-        `SELECT return_within_30_days, COUNT(*)::int AS count,
-         ROUND((COUNT(*) * 100.0 / SUM(COUNT(*)) OVER ()), 2)::float AS percentage,
-         COALESCE(AVG(refund_amount), 0)::float AS avg_refund,
-         COUNT(*) FILTER (WHERE status = 'Resolved')::int AS resolved_count
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-         GROUP BY return_within_30_days`,
-        [businessId, startDate]
+      resolution_stats AS (
+        SELECT resolution, COUNT(*)::int as count, AVG(refund_amount) as avg_refund 
+        FROM filtered_sheets
+        WHERE resolution IS NOT NULL AND resolution != 'Choose' AND resolution != ''
+        GROUP BY resolution
       ),
-
-      // 3. Blocked By Analysis
-      pool.query(
-        `SELECT blocked_by, COUNT(*)::int AS count,
-         COALESCE(AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400), 0)::float AS avg_blocked_days
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-           AND blocked_by IS NOT NULL AND blocked_by != 'Choose' AND blocked_by != ''
-         GROUP BY blocked_by ORDER BY count DESC`,
-        [businessId, startDate]
+      return_30_stats AS (
+        SELECT return_within_30_days, COUNT(*)::int as count, AVG(refund_amount) as avg_refund
+        FROM filtered_sheets
+        GROUP BY return_within_30_days
       ),
-
-      // 4. Return Type Breakdown
-      pool.query(
-        `SELECT return_type, COUNT(*)::int AS count,
-         ROUND((COUNT(*) * 100.0 / SUM(COUNT(*)) OVER ()), 2)::float AS percentage,
-         COALESCE(SUM(refund_amount), 0)::float AS total_refund
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-           AND return_type IS NOT NULL AND return_type != 'Choose' AND return_type != ''
-         GROUP BY return_type ORDER BY count DESC`,
-        [businessId, startDate]
+      blocked_stats AS (
+        SELECT blocked_by, COUNT(*)::int as count
+        FROM filtered_sheets
+        WHERE blocked_by IS NOT NULL AND blocked_by != 'Choose' AND blocked_by != ''
+        GROUP BY blocked_by
       ),
-
-      // 5. Replacement Analysis
-      pool.query(
-        `SELECT replacement_available, COUNT(*)::int AS count,
-         ROUND((COUNT(*) * 100.0 / SUM(COUNT(*)) OVER ()), 2)::float AS percentage
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-           AND LOWER(return_type) LIKE '%replacement%'
-         GROUP BY replacement_available`,
-        [businessId, startDate]
+      lock_stats AS (
+        SELECT
+          COUNT(*) FILTER (WHERE LOWER(issue) LIKE '%passcode%' OR LOWER(issue) LIKE '%pin%')::int AS passcode_count,
+          COUNT(*) FILTER (WHERE LOWER(issue) LIKE '%apple%id%' OR LOWER(issue) LIKE '%icloud%')::int AS apple_id_count,
+          COUNT(*) FILTER (WHERE LOWER(issue) LIKE '%google%' OR LOWER(issue) LIKE '%frp%')::int AS google_id_count
+        FROM filtered_sheets
       ),
-
-      // 6. Return Type + Resolution
-      pool.query(
-        `SELECT return_type, resolution, COUNT(*)::int AS count
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-           AND return_type != 'Choose' AND resolution != 'Choose'
-         GROUP BY return_type, resolution ORDER BY count DESC LIMIT 20`,
-        [businessId, startDate]
+      status_stats AS (
+        SELECT status, COUNT(*)::int as count
+        FROM filtered_sheets
+        WHERE status IS NOT NULL
+        GROUP BY status
       ),
-
-      // 7. Return Type + Return within 30 Days
-      pool.query(
-        `SELECT return_type, return_within_30_days, COUNT(*)::int AS count,
-         COALESCE(AVG(refund_amount), 0)::float AS avg_refund
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2 AND return_type != 'Choose'
-         GROUP BY return_type, return_within_30_days ORDER BY count DESC`,
-        [businessId, startDate]
+      return_type_stats AS (
+        SELECT return_type, COUNT(*)::int as count, SUM(refund_amount) as total_refund
+        FROM filtered_sheets
+        WHERE return_type IS NOT NULL AND return_type != 'Choose' AND return_type != ''
+        GROUP BY return_type
       ),
-
-      // 8. Return within 30 Days + Resolution
-      pool.query(
-        `SELECT return_within_30_days, resolution, COUNT(*)::int AS count,
-         ROUND((COUNT(*) * 100.0 / SUM(COUNT(*)) OVER ()), 2)::float AS percentage
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2 AND resolution != 'Choose'
-         GROUP BY return_within_30_days, resolution ORDER BY count DESC`,
-        [businessId, startDate]
+      replacement_stats AS (
+        SELECT replacement_available, COUNT(*)::int as count
+        FROM filtered_sheets
+        WHERE LOWER(return_type) LIKE '%replacement%'
+        GROUP BY replacement_available
       ),
-
-      // 9. Multiple Return + Resolution
-      pool.query(
-        `SELECT multiple_return, resolution, COUNT(*)::int AS count
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-           AND multiple_return != 'Choose' AND resolution != 'Choose'
-         GROUP BY multiple_return, resolution ORDER BY count DESC`,
-        [businessId, startDate]
+      repeated_imeis AS (
+        SELECT imei, COUNT(*)::int as count
+        FROM filtered_sheets
+        WHERE imei IS NOT NULL AND imei != ''
+        GROUP BY imei
+        HAVING COUNT(*) > 1
+        ORDER BY count DESC
+        LIMIT 20
       ),
-
-      // 10. Platform + Return Type + Resolution
-      pool.query(
-        `SELECT platform, return_type, resolution, COUNT(*)::int AS count
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-           AND platform IS NOT NULL AND return_type != 'Choose' AND resolution != 'Choose'
-         GROUP BY platform, return_type, resolution ORDER BY count DESC LIMIT 20`,
-        [businessId, startDate]
+      top_issues AS (
+        SELECT issue, resolution, COUNT(*)::int as count, AVG(refund_amount) as avg_refund
+        FROM filtered_sheets
+        WHERE issue != 'Choose' AND resolution != 'Choose'
+        GROUP BY issue, resolution
+        ORDER BY count DESC
+        LIMIT 20
       ),
-
-      // 11. Issue + Resolution
-      pool.query(
-        `SELECT issue, resolution, COUNT(*)::int AS count,
-         COALESCE(AVG(refund_amount), 0)::float AS avg_refund
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-           AND issue != 'Choose' AND resolution != 'Choose'
-         GROUP BY issue, resolution ORDER BY count DESC LIMIT 20`,
-        [businessId, startDate]
+      agent_stats AS (
+        SELECT done_by, COUNT(*)::int as count, SUM(refund_amount) as total_refund, AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400) as avg_days
+        FROM filtered_sheets
+        WHERE done_by != 'Choose' AND done_by != ''
+        GROUP BY done_by
+        ORDER BY count DESC
+        LIMIT 20
       ),
-
-      // 12. Status + Return Type
-      pool.query(
-        `SELECT status, return_type, COUNT(*)::int AS count
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2 AND return_type != 'Choose'
-         GROUP BY status, return_type ORDER BY count DESC`,
-        [businessId, startDate]
+      sku_stats AS (
+        SELECT sku, COUNT(*)::int as count, SUM(refund_amount) as total_refund
+        FROM filtered_sheets
+        WHERE sku IS NOT NULL AND sku != ''
+        GROUP BY sku
+        ORDER BY count DESC
+        LIMIT 20
       ),
-
-      // 13. Out of Warranty + Resolution
-      pool.query(
-        `SELECT out_of_warranty, resolution, COUNT(*)::int AS count,
-         COALESCE(SUM(refund_amount), 0)::float AS total_refund
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2 AND resolution != 'Choose'
-         GROUP BY out_of_warranty, resolution ORDER BY count DESC`,
-        [businessId, startDate]
+      platform_stats AS (
+        SELECT platform, COUNT(*)::int as count, SUM(refund_amount) as total_refund
+        FROM filtered_sheets
+        WHERE platform IS NOT NULL
+        GROUP BY platform
+        ORDER BY count DESC
       ),
-
-      // 14. Done By + Return Type
-      pool.query(
-        `SELECT done_by, return_type, COUNT(*)::int AS count,
-         ROUND(AVG(EXTRACT(EPOCH FROM (updated_at - created_at)) / 86400), 1)::float AS avg_days
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-           AND done_by != 'Choose' AND return_type != 'Choose'
-         GROUP BY done_by, return_type ORDER BY count DESC LIMIT 20`,
-        [businessId, startDate]
+      issue_stats AS (
+        SELECT issue, COUNT(*)::int as count
+        FROM filtered_sheets
+        WHERE issue != 'Choose' AND issue != ''
+        GROUP BY issue
+        ORDER BY count DESC
+        LIMIT 20
       ),
-
-      // 15. Apple/Google ID + Resolution
-      pool.query(
-        `SELECT apple_google_id, resolution, COUNT(*)::int AS count
-         FROM sheets
-         WHERE business_id = $1 AND date_received >= $2
-           AND apple_google_id != 'Choose' AND resolution != 'Choose'
-         GROUP BY apple_google_id, resolution ORDER BY count DESC`,
-        [businessId, startDate]
+      daily_trends AS (
+        SELECT DATE(date_received) as date, COUNT(*)::int as count, SUM(refund_amount) as total_amount
+        FROM filtered_sheets
+        GROUP BY DATE(date_received)
+        ORDER BY date ASC
+      ),
+      attachment_stats AS (
+        SELECT
+          COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM attachments a WHERE a.sheet_id = s.id))::int as with_count,
+          COUNT(*) FILTER (WHERE NOT EXISTS (SELECT 1 FROM attachments a WHERE a.sheet_id = s.id))::int as without_count
+        FROM filtered_sheets s
       )
-    ]);
+      SELECT
+        (SELECT json_agg(json_build_object('agentName', done_by, 'count', count, 'refundAmount', COALESCE(total_refund, 0), 'avgResolutionTime', COALESCE(avg_days, 0))) FROM agent_stats) as agent_performance,
+        (SELECT json_agg(json_build_object('sku', sku, 'count', count, 'refundAmount', COALESCE(total_refund, 0))) FROM sku_stats) as top_skus,
+        (SELECT json_agg(json_build_object('platform', platform, 'count', count, 'refundAmount', COALESCE(total_refund, 0))) FROM platform_stats) as platform_breakdown,
+        (SELECT json_agg(json_build_object('issue', issue, 'count', count, 'percentage', ROUND((count * 100.0 / (SELECT COUNT(*) FROM filtered_sheets)), 2))) FROM issue_stats) as issue_breakdown,
+        (SELECT json_agg(json_build_object('resolution', resolution, 'count', count, 'percentage', ROUND((count * 100.0 / (SELECT SUM(count) FROM resolution_stats)), 2), 'avg_refund', COALESCE(avg_refund, 0))) FROM resolution_stats) as resolution_breakdown,
+        (SELECT json_agg(json_build_object('return_within_30_days', return_within_30_days, 'count', count, 'percentage', ROUND((count * 100.0 / (SELECT SUM(count) FROM return_30_stats)), 2), 'avg_refund', COALESCE(avg_refund, 0))) FROM return_30_stats) as return_30_analysis,
+        (SELECT json_agg(json_build_object('blocked_by', blocked_by, 'count', count)) FROM blocked_stats) as blocked_by_analysis,
+        (SELECT row_to_json(lock_stats) FROM lock_stats) as lock_analysis,
+        (SELECT json_agg(json_build_object('status', status, 'count', count)) FROM status_stats) as status_breakdown,
+        (SELECT json_agg(json_build_object('return_type', return_type, 'count', count, 'percentage', ROUND((count * 100.0 / (SELECT SUM(count) FROM return_type_stats)), 2), 'total_refund', COALESCE(total_refund, 0))) FROM return_type_stats) as return_type_breakdown,
+        (SELECT json_agg(json_build_object('replacement_available', replacement_available, 'count', count, 'percentage', ROUND((count * 100.0 / (SELECT SUM(count) FROM replacement_stats)), 2))) FROM replacement_stats) as replacement_analysis,
+        (SELECT json_agg(json_build_object('imei', imei, 'count', count)) FROM repeated_imeis) as repeated_imeis,
+        (SELECT json_agg(json_build_object('issue', issue, 'resolution', resolution, 'count', count, 'avg_refund', COALESCE(avg_refund, 0))) FROM top_issues) as issue_resolution,
+        (SELECT json_agg(json_build_object('done_by', done_by, 'return_type', return_type, 'count', count, 'avg_days', COALESCE(avg_days, 0))) FROM agent_stats) as done_by_return_type,
+        (SELECT json_agg(json_build_object('date', date, 'orders', count, 'refunds', count, 'refundAmount', COALESCE(total_amount, 0))) FROM daily_trends) as trends,
+        (SELECT row_to_json(attachment_stats) FROM attachment_stats) as attachment_stats
+      `,
+      [businessId, startDate]
+    );
 
-    res.json({
-      resolutionBreakdown: resolutionRows.rows,
-      return30DaysAnalysis: return30DaysRows.rows,
-      blockedByAnalysis: blockedByRows.rows,
-      returnTypeBreakdown: returnTypeRows.rows,
-      replacementAnalysis: replacementAnalysisRows.rows,
-      returnTypeResolution: returnTypeResolutionRows.rows,
-      returnType30Days: returnType30DaysRows.rows,
-      return30DaysResolution: return30DaysResolutionRows.rows,
-      multipleReturnResolution: multipleReturnResolutionRows.rows,
-      platformReturnResolution: platformReturnResolutionRows.rows,
-      issueResolution: issueResolutionRows.rows,
-      statusReturnType: statusReturnTypeRows.rows,
-      oowResolution: oowResolutionRows.rows,
-      doneByReturnType: doneByReturnTypeRows.rows,
-      appleGoogleResolution: appleGoogleResolutionRows.rows,
+    const r = rows[0] || {};
+
+    // Fallback empty arrays if null (Postgres json_agg returns null for no rows)
+    const result = {
+      topSkus: r.top_skus || [],
+      platformBreakdown: r.platform_breakdown || [],
+      issueBreakdown: r.issue_breakdown || [],
+      agentPerformance: r.agent_performance || [],
+      trends: r.trends || [],
+      repeatedImeis: r.repeated_imeis || [],
+      // Additional useful metadata/stats
+      resolutionBreakdown: r.resolution_breakdown || [],
+      return30DaysAnalysis: r.return_30_analysis || [],
+      blockedByAnalysis: r.blocked_by_analysis || [],
+      lockAnalysis: r.lock_analysis || { passcode_count: 0, apple_id_count: 0, google_id_count: 0 },
+      statusBreakdown: r.status_breakdown || [],
+      returnTypeBreakdown: r.return_type_breakdown || [],
+      replacementAnalysis: r.replacement_analysis || [],
+      issueResolution: r.issue_resolution || [],
+      doneByReturnType: r.done_by_return_type || [],
+      attachmentStats: r.attachment_stats ? { with: r.attachment_stats.with_count, without: r.attachment_stats.without_count } : { with: 0, without: 0 },
+      // Empty fallbacks for unused legacy fields
+      returnTypeResolution: [],
+      returnType30Days: [],
+      return30DaysResolution: [],
+      multipleReturnResolution: [],
+      platformReturnResolution: [],
+      statusReturnType: [],
+      oowResolution: [],
+      appleGoogleResolution: [],
       range: range || "1m"
-    });
+    };
+
+    res.json(result);
+
   } catch (err) {
     console.error("POST /api/stats/:businessId/advanced error:", err);
     res.status(500).json({ message: "Failed to fetch advanced stats" });

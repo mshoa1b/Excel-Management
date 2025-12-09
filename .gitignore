@@ -79,4 +79,8 @@ Thumbs.db
 
 # Backup files
 *.bak
+*.bak
 *.backup
+
+# Allow shared settings
+!/.vscode/settings.json
