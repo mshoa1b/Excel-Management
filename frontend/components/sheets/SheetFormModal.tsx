@@ -12,7 +12,7 @@ import { blockedByOptions, lockedOptions, oowOptions, yesNoOptions, returnTypeOp
 import { fetchBMOrder } from './api';
 import { computePlatform, buildReturnId } from '@/lib/sheetFormulas';
 import { format } from 'date-fns';
-import { Loader2, MessageSquare, History, CalendarIcon } from 'lucide-react';
+import { Loader2, MessageSquare, History, CalendarIcon, Copy, Check } from 'lucide-react';
 import { AttachmentManager } from './AttachmentManager';
 import { apiClient } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
@@ -297,7 +297,26 @@ export function SheetFormModal({
                                             <h4 className="font-semibold text-sm text-slate-900 border-b pb-2">Quick Details</h4>
                                             <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
                                                 <span className="text-slate-500">Order Number:</span>
-                                                <span className="font-medium text-slate-900 truncate">{formData.order_no || '-'}</span>
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="font-medium text-slate-900 truncate">{formData.order_no || '-'}</span>
+                                                    {formData.order_no && (
+                                                        <button
+                                                            type="button"
+                                                            className="p-1 hover:bg-slate-100 rounded-md transition-colors text-slate-400 hover:text-blue-600 focus:outline-none"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                e.preventDefault();
+                                                                navigator.clipboard.writeText(formData.order_no || '');
+                                                                const btn = e.currentTarget;
+                                                                btn.style.color = '#16a34a';
+                                                                setTimeout(() => { btn.style.color = ''; }, 1000);
+                                                            }}
+                                                            title="Copy Order Number"
+                                                        >
+                                                            <Copy className="h-3 w-3" />
+                                                        </button>
+                                                    )}
+                                                </div>
 
                                                 <span className="text-slate-500">SKU:</span>
                                                 <span className="font-medium text-slate-900 truncate">{formData.sku || '-'}</span>

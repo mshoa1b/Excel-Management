@@ -23,7 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History, Pencil, ChevronDown, ChevronUp, Filter, AlertCircle, MoreHorizontal } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, Search, Calendar, Paperclip, MessageSquare, Download, History, Pencil, ChevronDown, ChevronUp, Filter, AlertCircle, MoreHorizontal, Copy, Check } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { AttachmentManager } from './AttachmentManager';
 import { SheetHistoryModal } from './SheetHistoryModal';
@@ -907,16 +907,50 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
           return (
             <HoverCard openDelay={200}>
               <HoverCardTrigger asChild>
-                <span className="cursor-pointer hover:text-blue-600 hover:underline decoration-dotted underline-offset-4 transition-colors block w-full h-full">
-                  {params.value}
-                </span>
+                <div className="flex items-center justify-between w-full h-full group/cell">
+                  <span className="cursor-pointer hover:text-blue-600 hover:underline decoration-dotted underline-offset-4 transition-colors truncate">
+                    {params.value}
+                  </span>
+                  <button
+                    className="ml-2 p-1 hover:bg-slate-100 rounded-md transition-all text-slate-300 hover:text-blue-600 focus:outline-none"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      e.preventDefault();
+                      navigator.clipboard.writeText(params.value);
+                      const btn = e.currentTarget;
+                      btn.style.color = '#16a34a';
+                      setTimeout(() => { btn.style.color = ''; }, 1000);
+                    }}
+                    title="Copy Order Number"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                </div>
               </HoverCardTrigger>
               <HoverCardContent className="w-96 p-4 bg-white shadow-xl border-slate-200 z-[9999]" align="start">
                 <div className="space-y-3">
                   <h4 className="font-semibold text-[15px] text-slate-900 border-b pb-2">Quick Details</h4>
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
                     <span className="text-slate-500">Order Number:</span>
-                    <span className="font-medium text-slate-900 truncate">{row.order_no || '-'}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="font-medium text-slate-900 truncate">{row.order_no || '-'}</span>
+                      {row.order_no && (
+                        <button
+                          className="p-1 hover:bg-slate-100 rounded-md transition-colors text-slate-400 hover:text-blue-600 focus:outline-none"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigator.clipboard.writeText(row.order_no);
+                            // Visual feedback could be added here if needed, but simple for now
+                            const btn = e.currentTarget;
+                            btn.style.color = '#16a34a'; // green-600
+                            setTimeout(() => { btn.style.color = ''; }, 1000);
+                          }}
+                          title="Copy Order Number"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
 
                     <span className="text-slate-500">SKU:</span>
                     <span className="font-medium text-slate-900 truncate">{row.sku || '-'}</span>
