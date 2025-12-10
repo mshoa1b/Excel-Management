@@ -13,5 +13,13 @@ export const MULTILINE_COLS = ['customer_comment', 'additional_notes', 'cs_comme
 export const yesNoOptions = ['Choose', 'Yes', 'No'];
 export const returnTypeOptions = ['Choose', 'Refund', 'Replacement', 'Repair'];
 
+export const returnTypeColors: Record<string, string> = {
+    'Refund': 'bg-red-50 text-red-700',
+    'Replacement': 'bg-blue-50 text-blue-700',
+    'Repair': 'bg-amber-50 text-amber-700',
+    'Choose': 'bg-slate-50 text-slate-700',
+    'default': 'bg-slate-50 text-slate-700'
+};
+
 export const resolutionOptions = ['Choose', 'Back in stock',
     'Sent back to supplier', 'Sent repaired back to customer', 'Sent un-repaired back to customer', 'BER'];

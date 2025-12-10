@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { SheetRecord } from './SheetsGrid';
-import { blockedByOptions, lockedOptions, oowOptions, yesNoOptions, returnTypeOptions, resolutionOptions } from './constants';
+import { blockedByOptions, lockedOptions, oowOptions, yesNoOptions, returnTypeOptions, resolutionOptions, returnTypeColors } from './constants';
 import { fetchBMOrder } from './api';
 import { computePlatform, buildReturnId } from '@/lib/sheetFormulas';
 import { format } from 'date-fns';
@@ -303,15 +303,15 @@ export function SheetFormModal({
                                             placeholder="Order No"
                                         />
                                     </HoverCardTrigger>
-                                    <HoverCardContent className="w-96 p-4 bg-white shadow-xl border-slate-200" align="start">
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between border-b pb-2">
-                                                <h4 className="font-semibold text-sm text-slate-900">Quick Details</h4>
-                                                <span className="text-[10px] text-slate-400">
+                                    <HoverCardContent className="w-96 p-0 bg-white shadow-xl border-slate-200 overflow-hidden" align="start">
+                                        <div className="flex flex-col">
+                                            <div className={cn("flex items-center justify-between px-4 py-3 border-b border-slate-100/50", returnTypeColors[formData.return_type || ''] || returnTypeColors['default'])}>
+                                                <h4 className="font-semibold text-sm">{formData.return_type || 'Quick Details'}</h4>
+                                                <span className="text-[10px] opacity-70">
                                                     Updated: {formData.updated_at ? format(new Date(formData.updated_at), 'dd-MM-yyyy HH:mm') : '-'}
                                                 </span>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+                                            <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs p-4">
                                                 <span className="text-slate-500">Order Number:</span>
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <span className="font-medium text-slate-900 truncate">{formData.order_no || '-'}</span>
@@ -339,9 +339,6 @@ export function SheetFormModal({
 
                                                 <span className="text-slate-500">Customer Comment:</span>
                                                 <span className="font-medium text-slate-900 whitespace-pre-wrap break-words" title={formData.customer_comment}>{formData.customer_comment || '-'}</span>
-
-                                                <span className="text-slate-500">Return Type:</span>
-                                                <span className="font-medium text-slate-900">{formData.return_type || '-'}</span>
 
                                                 <span className="text-slate-500">Locked:</span>
                                                 <span className="font-medium text-slate-900">{formData.locked || '-'}</span>

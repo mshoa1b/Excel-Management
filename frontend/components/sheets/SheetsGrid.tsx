@@ -32,7 +32,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
-import { blockedByOptions, MULTILINE_COLS } from './constants';
+import { blockedByOptions, MULTILINE_COLS, returnTypeColors } from './constants';
 import { listSheets, createSheet, updateSheet, deleteSheet, fetchBMOrder, searchSheets, getSheetsByDateRange } from './api';
 import { computePlatform, computeWithin30, buildReturnId } from '@/lib/sheetFormulas';
 import { useCurrency } from '@/hooks/useCurrency';
@@ -326,39 +326,38 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
   // Smart search, platform, and tile filtering
   useEffect(() => {
+    let active = true;
     const performFiltering = async () => {
       let dataToFilter = rowData;
 
       // Apply search filter first
       if (searchTerm.trim()) {
-        const searchLower = searchTerm.toLowerCase();
-        const localFiltered = rowData.filter(row => {
-          const orderNo = (row.order_no || '').toLowerCase();
-          const customerName = (row.customer_name || '').toLowerCase();
-          return orderNo.includes(searchLower) || customerName.includes(searchLower);
-        });
+        try {
+          const searchResults = await searchSheets(businessId, searchTerm);
+          if (!active) return; // Prevent race conditions
 
-        if (localFiltered.length > 0) {
-          dataToFilter = localFiltered;
-        } else {
-          try {
-            const searchResults = await searchSheets(businessId, searchTerm);
-            const formatted = searchResults.map((row: any) => ({
-              ...row,
-              id: Number(row.id),
-              business_id: Number(row.business_id),
-              refund_amount: Number(row.refund_amount ?? 0),
-              date_received: row.date_received ? toYMD(row.date_received) : '',
-              order_date: row.order_date ? toYMD(row.order_date) : '',
-              refund_date: row.refund_date ? toYMD(row.refund_date) : '',
-              return_within_30_days: !!row.return_within_30_days,
-              out_of_warranty: row.out_of_warranty || 'Choose',
-              updated_at: row.updated_at,
-            }));
-            dataToFilter = formatted;
-          } catch (error) {
-            dataToFilter = localFiltered;
-          }
+          const formatted = searchResults.map((row: any) => ({
+            ...row,
+            id: Number(row.id),
+            business_id: Number(row.business_id),
+            refund_amount: Number(row.refund_amount ?? 0),
+            date_received: row.date_received ? toYMD(row.date_received) : '',
+            order_date: row.order_date ? toYMD(row.order_date) : '',
+            refund_date: row.refund_date ? toYMD(row.refund_date) : '',
+            return_within_30_days: !!row.return_within_30_days,
+            out_of_warranty: row.out_of_warranty || 'Choose',
+            updated_at: row.updated_at,
+          }));
+          dataToFilter = formatted;
+        } catch (error) {
+          if (!active) return;
+          console.error("Search failed, falling back to local filter", error);
+          const searchLower = searchTerm.toLowerCase();
+          dataToFilter = rowData.filter(row => {
+            const orderNo = (row.order_no || '').toLowerCase();
+            const customerName = (row.customer_name || '').toLowerCase();
+            return orderNo.includes(searchLower) || customerName.includes(searchLower);
+          });
         }
       }
 
@@ -439,7 +438,10 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     };
 
     const timeoutId = setTimeout(performFiltering, 300);
-    return () => clearTimeout(timeoutId);
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
   }, [rowData, searchTerm, platformFilter, businessId, activeFilter]);
 
   // Prevent hover from overriding row colors
@@ -656,6 +658,13 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       reflowAutoHeight();
     }, 0);
   }, [businessId, autoSizeNonMultiline, reflowAutoHeight, recomputeTodayTotals]);
+  const handleExport = useCallback(() => {
+    const dataToExport = filteredData.length > 0 ? filteredData : rowData;
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Sheets");
+    XLSX.writeFile(workbook, `Sheets_Export_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  }, [filteredData, rowData]);
 
   useEffect(() => {
     loadStaffOptions();
@@ -927,15 +936,15 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                   </button>
                 </div>
               </HoverCardTrigger>
-              <HoverCardContent className="w-96 p-4 bg-white shadow-xl border-slate-200 z-[9999]" align="start">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b pb-2">
-                    <h4 className="font-semibold text-[15px] text-slate-900">Quick Details</h4>
-                    <span className="text-[11px] text-slate-400">
+              <HoverCardContent className="w-96 p-0 bg-white shadow-xl border-slate-200 z-[9999] overflow-hidden" align="start">
+                <div className="flex flex-col">
+                  <div className={cn("flex items-center justify-between px-4 py-3 border-b border-slate-100/50", returnTypeColors[row.return_type || ''] || returnTypeColors['default'])}>
+                    <h4 className="font-semibold text-[15px]">{row.return_type || 'Quick Details'}</h4>
+                    <span className="text-[11px] opacity-70">
                       Updated: {row.updated_at ? format(new Date(row.updated_at), 'dd-MM-yyyy HH:mm') : '-'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px]">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px] p-4">
                     <span className="text-slate-500">Order Number:</span>
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="font-medium text-slate-900 truncate">{row.order_no || '-'}</span>
@@ -962,9 +971,6 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
                     <span className="text-slate-500">Customer Comment:</span>
                     <span className="font-medium text-slate-900 whitespace-pre-wrap break-words" title={row.customer_comment}>{row.customer_comment || '-'}</span>
-
-                    <span className="text-slate-500">Return Type:</span>
-                    <span className="font-medium text-slate-900">{row.return_type || '-'}</span>
 
                     <span className="text-slate-500">Locked:</span>
                     <span className="font-medium text-slate-900">{row.locked || '-'}</span>
@@ -1337,6 +1343,9 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                 </Button>
                 <Button
                   variant="outline"
+                  size="sm"
+                  className="h-8 text-[13px] px-2"
+                  onClick={handleExport}
                 >
                   <Download className="h-3.5 w-3.5 mr-1" /> Export
                 </Button>
