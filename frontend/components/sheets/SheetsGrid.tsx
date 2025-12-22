@@ -396,6 +396,14 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
               const diffDays = diffTime / (1000 * 3600 * 24);
               return diffDays > 14;
             }
+            case 'Overdue5': {
+              if (!row.date_received || status === 'resolved') return false;
+              const received = new Date(row.date_received);
+              const now = new Date();
+              const diffTime = now.getTime() - received.getTime();
+              const diffDays = diffTime / (1000 * 3600 * 24);
+              return diffDays > 5;
+            }
             case 'ReplacementPending': {
               const isReplacement = row.return_type === 'Replacement';
               const repAvail = row.replacement_available;
@@ -1169,6 +1177,15 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
       return diffDays > 14;
     }).length;
 
+    const overdue5 = filteredData.filter(row => {
+      if (!row.date_received || (row.status && row.status.toLowerCase() === 'resolved')) return false;
+      const received = new Date(row.date_received);
+      const now = new Date();
+      const diffTime = now.getTime() - received.getTime();
+      const diffDays = diffTime / (1000 * 3600 * 24);
+      return diffDays > 5;
+    }).length;
+
     const replacementPending = filteredData.filter(row => {
       const isReplacement = row.return_type === 'Replacement';
       const repAvail = row.replacement_available;
@@ -1183,7 +1200,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
     const total = filteredData.length;
     const actionable = unresolved; // Cases that can be worked on (not blocked, not resolved)
 
-    return { blocked, unresolved, resolved, total, actionable, overdue, replacementPending, resolutionIsChoose };
+    return { blocked, unresolved, resolved, total, actionable, overdue, overdue5, replacementPending, resolutionIsChoose };
   }, [filteredData]);
 
 
@@ -1357,6 +1374,7 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
 
               <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 p-2 bg-slate-50/50 rounded-lg border border-slate-100">
                 <div className="flex flex-wrap gap-2">
+
                   <div
                     onClick={() => toggleFilter('Blocked')}
                     className={cn(
@@ -1413,6 +1431,17 @@ export default function SheetsGrid({ businessId }: { businessId: string }) {
                   >
                     <span className="font-light text-[11px] uppercase tracking-wide">14+ Days</span>
                     <span className="text-[15px] font-bold">{statusStats.overdue}</span>
+                  </div>
+
+                  <div
+                    onClick={() => toggleFilter('Overdue5')}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1 rounded-full border border-transparent cursor-pointer transition-all shadow-sm hover:opacity-90 bg-orange-500 text-white",
+                      activeFilter === 'Overdue5' ? 'ring-2 ring-offset-1 ring-slate-400' : ''
+                    )}
+                  >
+                    <span className="font-light text-[11px] uppercase tracking-wide">5+ Days</span>
+                    <span className="text-[15px] font-bold">{statusStats.overdue5}</span>
                   </div>
                 </div>
 
